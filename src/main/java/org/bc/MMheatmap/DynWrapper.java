@@ -7,6 +7,10 @@ import org.dynmap.markers.MarkerSet;
 import org.joml.Vector2d;
 import org.joml.Vector3d;
 
+import java.util.Iterator;
+import java.util.Objects;
+import java.util.Set;
+
 
 /**
  * A wrapper object to create dynmap shapes easier
@@ -27,6 +31,18 @@ public class DynWrapper {
     }
 
     /**
+     * Given an red, green, and blue color, from 0-255, it will convert the color into a packed integer
+     *
+     * @param r the amount of red from 0 - 255
+     * @param g the amount of green from 0 - 255
+     * @param b the amount of blue from 0 - 255
+     * @return returns the red, green, blue color as a packed integer
+     */
+    private static int rgbToInteger(int r, int g, int b) {
+        return ((r&0x0ff)<<16)|((g&0x0ff)<<8)|(b&0x0ff);
+    }
+
+    /**
      * If the marker set already exists, the method will return that set, otherwise, it will create a set under that name and return it.
      *
      * @param areaSetName the name of the set to either get, or to be created and returned
@@ -40,45 +56,26 @@ public class DynWrapper {
         return set;
     }
 
-    public static void createCircleArea(MarkerSet set, String label, String worldName, Vector3d xyz, double width, double height) {
-        String id = "id";
-        set.createCircleMarker(id, label, false, worldName, xyz.x(), xyz.y(), xyz.z(), width, height, false);
-
-        int index = 0;
-        for (CircleMarker mark : set.getCircleMarkers()) {
-            if (mark.getLabel() == label) {
-                System.out.printf("Debug: Found Marker %s @ index %d\n", label, index);
-            }
-            index++;
-        }
-
-    }
-
     /**
-     * This Method is currently deprecated, simply for testing purposes.
+     * Deletes an areaSet with the label "areaSetName"
      *
-     * @param set
-     * @param sizeSq
-     * @param countSq
-     * @param xy
+     * Implementation from https://github.com/webbukkit/dynmap/blob/93b454efb8802dc7406d6873434f2aeec5c636f4/DynmapCore/src/main/java/org/dynmap/markers/impl/MarkerAPIImpl.java#L2112
+     *
+     * @param areaSetName The label of the areaSet to be deleted
      */
-    @Deprecated()
-    public static void createGrid(MarkerSet set, double sizeSq, int countSq, Vector2d xy) {
-        double x = xy.x(), y = xy.y();
-        for (int i = 0; i < countSq*countSq; i++) {
-            int indexX = i % countSq, indexY = i / countSq;
-            double cellX = x + (indexX*sizeSq);
-            double cellY = y + (indexY*sizeSq);
-            double[] xy1 = new double[]{cellX,cellY};
-            double[] xy2 = new double[]{cellX+sizeSq, cellY+sizeSq};
-            String id = indexX + "," + indexY;
-            set.createAreaMarker(id, "Cell "+id, false, "world", xy2, xy1, false);
+    public static void deleteAreaSet(String areaSetName) {
+        //
+        // this is the same implementation (or should be) as "/dmarker deleteset label:"areaSetName" "
+        Set<MarkerSet> sets = api.getMarkerAPI().getMarkerSets();
+        MarkerSet set = null;
+        for(MarkerSet s : sets) {
+            if(s.getMarkerSetLabel().equals(areaSetName)) {
+                set = s;
+                break;
+            }
         }
-        for (AreaMarker marker : set.getAreaMarkers()) {
-            //opacity, color?
-            marker.setFillStyle(0.5, 65280);
-        }
-
+        if (set != null)
+            set.deleteMarkerSet();
     }
 
     /**
@@ -112,15 +109,15 @@ public class DynWrapper {
             double[] xy1 = new double[]{(indexX*cellSizeWidth)-(width/2), ((indexX*cellSizeWidth) + cellSizeWidth)-(width/2)};
             double[] xy2 = new double[]{(indexY*cellSizeHeight)-(height/2), (((indexY*cellSizeHeight) + cellSizeHeight))-(height/2)};
 
-            // id, label, processLabelAsHtml???, world, [list of x coords], [list of y coords], persistent?
-            set.createAreaMarker(indexX+","+indexY, "Cell " + indexX + ", " +indexY, false, "world", xy1, xy2, false);
-
-            System.out.printf("Placing Square: %.1f %.1f -> %.1f %.1f\n", xy1[0],xy1[1],xy2[0],xy2[1]);
+            // id, label, processLabelAsHtml, world, [list of x coords], [list of y coords], persistent
+            set.createAreaMarker(indexX+","+indexY, "Cell " + indexX + ", " +indexY, false, "world", xy1, xy2, true);
         }
 
         for (AreaMarker marker : set.getAreaMarkers()) {
-            //opacity, color?
-            marker.setFillStyle(0.5, 65280);
+            //opacity, hex color
+            marker.setFillStyle(0.5, rgbToInteger(0,0,200));
+            //weight, opacity, hex color
+            marker.setLineStyle(1, 0.5, rgbToInteger(0,0,255));
         }
     }
 
