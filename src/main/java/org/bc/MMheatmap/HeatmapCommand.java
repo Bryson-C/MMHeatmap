@@ -42,53 +42,51 @@ public class HeatmapCommand {
         // Command root
         LiteralArgumentBuilder<CommandSourceStack> commandRoot = Commands.literal("mmheatmap");
 
-        LiteralArgumentBuilder<CommandSourceStack> divideWorld = Commands.literal("create")
-                .then(Commands.literal("divideWorld")
-                    .then(Commands.argument("topleftpos", ArgumentTypes.blockPosition())
-                        .then(Commands.argument("bottomrightpos", ArgumentTypes.blockPosition())
-                            .then(Commands.argument("divisioncountsq", IntegerArgumentType.integer(1))
-                                .executes(context -> {
+        LiteralArgumentBuilder<CommandSourceStack> divideWorld = Commands.literal("divideWorld")
+                .then(Commands.argument("topleftpos", ArgumentTypes.blockPosition())
+                    .then(Commands.argument("bottomrightpos", ArgumentTypes.blockPosition())
+                        .then(Commands.argument("divisioncountsq", IntegerArgumentType.integer(1))
+                            .executes(context -> {
 
 
-                                    // parse position from command arguments
-                                    BlockPositionResolver resolver = context.getArgument("topleftpos", BlockPositionResolver.class);
-                                    BlockPosition pos1 = resolver.resolve(context.getSource());
-                                    Vector3d xyz1 = new Vector3d(pos1.x(),pos1.y(),pos1.z());
+                                // parse position from command arguments
+                                BlockPositionResolver resolver = context.getArgument("topleftpos", BlockPositionResolver.class);
+                                BlockPosition pos1 = resolver.resolve(context.getSource());
+                                Vector3d xyz1 = new Vector3d(pos1.x(),pos1.y(),pos1.z());
 
-                                    BlockPositionResolver resolver2 = context.getArgument("bottomrightpos", BlockPositionResolver.class);
-                                    BlockPosition pos2 = resolver2.resolve(context.getSource());
-                                    Vector3d xyz2 = new Vector3d(pos2.x(),pos2.y(),pos2.z());
+                                BlockPositionResolver resolver2 = context.getArgument("bottomrightpos", BlockPositionResolver.class);
+                                BlockPosition pos2 = resolver2.resolve(context.getSource());
+                                Vector3d xyz2 = new Vector3d(pos2.x(),pos2.y(),pos2.z());
 
-                                    int divisionCount = IntegerArgumentType.getInteger(context, "divisioncountsq");
+                                int divisionCount = IntegerArgumentType.getInteger(context, "divisioncountsq");
 
-                                    // TODO: Get the world from the command sender
-                                    String world = "world";
+                                // TODO: Get the world from the command sender
+                                String world = "world";
 
-                                    CommandSender sender = context.getSource().getSender();
-                                    sender.sendRichMessage("<blue> Dividing World");
+                                CommandSender sender = context.getSource().getSender();
+                                sender.sendRichMessage("<blue> Dividing World");
 
-                                    long startTime = System.nanoTime();
+                                long startTime = System.nanoTime();
 
-                                    try {
-                                        MarkerSet set = DynWrapper.getAreaSetOrCreate("heatmap");
-                                        DynWrapper.divideWorld(set, xyz1, xyz2, divisionCount);
-                                    } catch (Exception e) {
-                                        System.err.printf("Failed To Create Marker: %s\n", e.getMessage());
-                                        sender.sendRichMessage("<red>Failed Creating Dynmap Marker; See Console");
-                                        return -1;
-                                    }
+                                try {
+                                    MarkerSet set = DynWrapper.getAreaSetOrCreate("heatmap");
+                                    DynWrapper.divideWorld(set, xyz1, xyz2, divisionCount);
+                                } catch (Exception e) {
+                                    System.err.printf("Failed To Create Marker: %s\n", e.getMessage());
+                                    sender.sendRichMessage("<red>Failed Creating Dynmap Marker; See Console");
+                                    return -1;
+                                }
 
-                                    sender.sendRichMessage("<color:#30f000> Done! (" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-startTime) + "ms)");
+                                sender.sendRichMessage("<color:#30f000> Done! (" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-startTime) + "ms)");
 
-                                    return Command.SINGLE_SUCCESS;
+                                return Command.SINGLE_SUCCESS;
 
-                                })
-                            )
+                            })
                         )
                     )
                 );
 
-        LiteralArgumentBuilder<CommandSourceStack> deleteHeatmap = Commands.literal("deleteCurrentHeatmap")
+        LiteralArgumentBuilder<CommandSourceStack> deleteCurrent = Commands.literal("deleteCurrent")
                 .executes(context -> {
                     CommandSender sender = context.getSource().getSender();
                     sender.sendRichMessage("<blue> Deleting Heatmap Overlay");
@@ -101,9 +99,13 @@ public class HeatmapCommand {
 
                     return Command.SINGLE_SUCCESS;
                 });
-
         // Append subtrees
-        commandRoot.then(divideWorld);
+        LiteralArgumentBuilder<CommandSourceStack> createHeatmap = Commands.literal("create");
+        createHeatmap.then(divideWorld);
+        commandRoot.then(createHeatmap);
+
+        LiteralArgumentBuilder<CommandSourceStack> deleteHeatmap = Commands.literal("delete");
+        deleteHeatmap.then(deleteCurrent);
         commandRoot.then(deleteHeatmap);
 
         // Build command
