@@ -1,8 +1,7 @@
-package org.bc.mMheatmap;
+package org.bc.MMheatmap;
 
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.dynmap.DynmapCommonAPI;
 import org.dynmap.DynmapCommonAPIListener;
 
 

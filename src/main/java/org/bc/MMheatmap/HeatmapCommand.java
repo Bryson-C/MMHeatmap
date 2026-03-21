@@ -1,4 +1,4 @@
-package org.bc.mMheatmap;
+package org.bc.MMheatmap;
 
 
 import com.mojang.brigadier.Command;
@@ -13,10 +13,7 @@ import io.papermc.paper.command.brigadier.argument.resolvers.BlockPositionResolv
 import io.papermc.paper.math.BlockPosition;
 import org.bukkit.command.CommandSender;
 import org.dynmap.DynmapCommonAPI;
-import org.dynmap.DynmapCommonAPIListener;
-import org.dynmap.markers.CircleMarker;
 import org.dynmap.markers.MarkerSet;
-import org.joml.Vector2d;
 import org.joml.Vector3d;
 
 /**

@@ -1,4 +1,4 @@
-package org.bc.mMheatmap;
+package org.bc.MMheatmap;
 
 import org.dynmap.DynmapCommonAPI;
 import org.dynmap.DynmapCommonAPIListener;
