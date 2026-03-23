@@ -1,5 +1,6 @@
 package org.bc.MMheatmap;
 
+import org.bukkit.configuration.file.FileConfiguration;
 import org.dynmap.DynmapCommonAPI;
 import org.dynmap.markers.AreaMarker;
 import org.dynmap.markers.CircleMarker;
@@ -7,6 +8,7 @@ import org.dynmap.markers.MarkerSet;
 import org.joml.Vector2d;
 import org.joml.Vector3d;
 
+import java.io.File;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.Set;
@@ -20,11 +22,11 @@ import java.util.Set;
 public class DynWrapper {
     private static DynmapCommonAPI api;
 
-
     /**
-     * Constructor setting the Dynmap Api to a given api variable to be used within the entire class
+     * Constructor setting the Dynmap Api to a given api and config variable to be used within the entire class
      *
      * @param api The Dynmap Api object to be saved within the class for later method calls
+     * @param config The plugin config to be used within the wrapper
      */
     public DynWrapper(DynmapCommonAPI api) {
         DynWrapper.api = api;
@@ -86,10 +88,10 @@ public class DynWrapper {
      * @param bottomRight
      * @param divisionCountSq
      */
-    public static void divideWorld(MarkerSet set, Vector3d topLeft, Vector3d bottomRight, int divisionCountSq) {
+    public static void divideWorld(MarkerSet set, String world, Vector3d topLeft, Vector3d bottomRight, int divisionCountSq) {
         // get coords in an easier format
-        double x1 = topLeft.x(), y1 = topLeft.y(), z1 = topLeft.z();
-        double x2 = bottomRight.x(), y2 = bottomRight.y(), z2 = bottomRight.z();
+        double x1 = topLeft.x(), z1 = topLeft.z();
+        double x2 = bottomRight.x(), z2 = bottomRight.z();
 
         // use math to get total size of area (in 2d, y coordinate doesnt matter)
         double width = Math.abs(x1-x2);
@@ -110,7 +112,7 @@ public class DynWrapper {
             double[] xy2 = new double[]{(indexY*cellSizeHeight)-(height/2), (((indexY*cellSizeHeight) + cellSizeHeight))-(height/2)};
 
             // id, label, processLabelAsHtml, world, [list of x coords], [list of y coords], persistent
-            set.createAreaMarker(indexX+","+indexY, "Cell " + indexX + ", " +indexY, false, "world", xy1, xy2, true);
+            set.createAreaMarker(indexX+","+indexY, "Cell " + indexX + ", " +indexY, false, world, xy1, xy2, true);
         }
 
         for (AreaMarker marker : set.getAreaMarkers()) {
@@ -121,5 +123,31 @@ public class DynWrapper {
         }
     }
 
+    /**
+     * Will get
+     * @param topLeft
+     * @param bottomRight
+     * @param divisionCountSq
+     * @param position
+     * @return
+     */
+    public static int[] getDividedWorldCellFromPosition(Vector3d topLeft, Vector3d bottomRight, int divisionCountSq, Vector3d position) {
+
+        double x1 = topLeft.x(), z1 = topLeft.z();
+        double x2 = bottomRight.x(), z2 = bottomRight.z();
+
+        // use math to get total size of area (in 2d, y coordinate doesnt matter)
+        double width = Math.abs(x1-x2), height = Math.abs(z1-z2);
+
+        // get the amount of space each tile should take in the full area
+        double cellSizeWidth = (width/divisionCountSq), cellSizeHeight = (height/divisionCountSq);
+
+
+        int x = (int)Math.floor((divisionCountSq/width)*position.x)+(divisionCountSq/2),
+            y = (int)Math.floor((divisionCountSq/width)*position.z)+(divisionCountSq/2);
+
+
+        return new int[]{x,y};
+    }
 
 }
