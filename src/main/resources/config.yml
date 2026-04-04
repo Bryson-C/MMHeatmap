@@ -1,0 +1,16 @@
+database:
+  address: "jdbc:mysql://localhost:3306/mmheatmap"
+  username: "root"
+  password: "1550"
+
+defaults:
+  world_name: "world"
+  pollFrequencySeconds: 60
+  pollAreaChunkSize: 1
+
+colors:
+  #https://cssgradient.io/ for the gradients
+  cellActivityGradient: "#0F7299,#0F7299,#EDDD53"
+  cellOpacity: 0.60
+  borderColor: "#E0E0E0"
+  borderOpacity: 0.70
