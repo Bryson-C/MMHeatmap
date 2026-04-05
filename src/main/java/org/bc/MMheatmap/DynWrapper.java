@@ -241,11 +241,9 @@ public class DynWrapper {
      * @param flags
      */
     public static void createActiveHeatmapCellsFromCoords(HeatmapLayer layer, MarkerSet set, Map<String, Integer> points, String flags) {
-        // clear set to avoid duplicate related errors
-        String setLabel = set.getMarkerSetLabel();
-        set.deleteMarkerSet();
-        set = getAreaSetOrCreate(setLabel);
-
+        // clear area first to avoid duplicate cell errors
+        DynWrapper.deleteAreaSet(layer.label);
+        set = getAreaSetOrCreate(layer.label);
 
         // get coords in an easier format
         double x1 = layer.topLeft.x(), z1 = layer.topLeft.y();
@@ -259,20 +257,35 @@ public class DynWrapper {
         double cellSizeWidth = (width/layer.divisions);
         double cellSizeHeight = (height/layer.divisions);
 
+
         // Setting min to the max, and max to the min, will ensure these values will always be set so long as there is more than 1 point
-        // we do this in a separate loop so that we can apply the correct color coating to the cells and avoid doing more math than necessary
+        // we do this in a separate loop so that we can apply the correct color coating to the cells and avoid doing more math than necessary.
+        // Here we also need to combine nearby areas if they will both be included inside the same heatmap tile, this is to avoid duplicate errors
         int minActivity = Integer.MAX_VALUE, maxActivity = Integer.MIN_VALUE;
-        for (Integer activity : points.values()) {
+        Map<String, Integer> deDuplicateMap = new HashMap<>();
+        for (Map.Entry<String, Integer> kv : points.entrySet()) {
+            String[] p1 = kv.getKey().strip().split(",");
+            double x = Double.parseDouble(p1[0]), y = Double.parseDouble(p1[1]);
+            int[] index = getDividedWorldCellFromPosition(layer.topLeft, layer.bottomRight, layer.divisions, new Vector2d(x, y));
+
+            int activity = kv.getValue();
+            String key = String.format("%d,%d", index[0],index[1]);
+            if (deDuplicateMap.containsKey(key)) {
+                activity += deDuplicateMap.get(key);
+            }
+
             minActivity = Math.min(minActivity, activity);
             maxActivity = Math.max(maxActivity, activity);
+
+            deDuplicateMap.put(key, activity);
         }
 
 
-        for (Map.Entry<String, Integer> kv : points.entrySet()) {
+        for (Map.Entry<String, Integer> kv : deDuplicateMap.entrySet()) {
 
-            // get the point from the
+            // Here, the area index has already been created from the above loop, so we just need to split it up again, no more parsing required!
             String[] p1 = kv.getKey().strip().split(",");
-            int[] index = getDividedWorldCellFromPosition(layer.topLeft, layer.bottomRight, layer.divisions, new Vector2d(Double.parseDouble(p1[0]), Double.parseDouble(p1[1])));
+            int[] index = { Integer.parseInt(p1[0]), Integer.parseInt(p1[1]) };
 
             //area marker format
             //x: [x1, x2, ... xN]
@@ -304,6 +317,7 @@ public class DynWrapper {
             if (marker != null) {
                 marker.setFillStyle(config.getDouble("colors.cellOpacity"), colorToInteger(c));
                 marker.setLineStyle(1, config.getDouble("colors.borderOpacity"), colorToInteger(hexToColor(config.getString("colors.borderColor"))));
+                marker.setDescription("Activity: " + kv.getValue());
             } else {
                 System.err.println("Error styling area marker, marker is null");
             }

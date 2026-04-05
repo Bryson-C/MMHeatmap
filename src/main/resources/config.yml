@@ -1,16 +1,27 @@
 database:
-  address: "jdbc:mysql://address/database"
-  username: "username"
-  password: "password"
+  address: ''
+  username: ''
+  password: ''
 
 defaults:
-  world_name: "world"
+  world_name: 'world'
   pollFrequencySeconds: 60
+  # will log the amount of time taken to poll the heatmap to the command/function caller
+  # (i.e. if a player called the poll function, they will receive the message, otherwise the console)
+  logPollTime: true
   pollAreaChunkSize: 1
+  # if the poll range in seconds for a layer is set to this value, it will never update (after being created)
+  # make sure this will never occur in practice by accident
+  # value = INT_MAX
+  noUpdatePollRangeSeconds: 2147483647
+  # the date that all points will poll afterwards. The range is from (now-defaultPollRangeSeconds, now)
+  # if the poll range is not given by a command/parameter (i.e. this is the default)
+  # value = INT_MAX-1
+  pollRangeSeconds: 2147483646
 
 colors:
-  #https://cssgradient.io/ for the gradients
-  cellActivityGradient: "#0F7299,#0F7299,#EDDD53"
-  cellOpacity: 0.60
-  borderColor: "#E0E0E0"
+  # https://cssgradient.io/ for the gradients
+  cellActivityGradient: '#0F7299,#57C785,#EDDD53,#FF4400'
+  cellOpacity: 0.50
+  borderColor: '#E0E0E0'
   borderOpacity: 0.70

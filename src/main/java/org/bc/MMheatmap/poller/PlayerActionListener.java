@@ -11,6 +11,7 @@ import org.bukkit.event.block.BlockPlaceEvent;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 
 /**
  * This class is used as the "Super Event Handler", its function is to listen to all events which would affect the heatmap's
@@ -37,6 +38,32 @@ public class PlayerActionListener implements Listener {
 
     // Optimize memory, or make sure that memory doesn't get to insane
     static Map<String, Map<String, PlayerChunkInteractions>> playerActions = new HashMap<>();
+
+
+    /**
+     * NOTE: Not To Be Used In Production, Testing Code Only
+     *
+     */
+    public static void generateFakePlayerData(int count, int minActivity, int maxActivity) {
+        Random r = new Random();
+        for (int i = 0; i < count; i++) {
+            String key = String.format("%s;%d,%d", "world", r.nextInt(512)-256, r.nextInt(512)-256);
+            String playerName = "debugplayer";
+
+            if (!playerActions.containsKey(key)) {
+                playerActions.put(key, new HashMap<>());
+            }
+            Map<String, PlayerChunkInteractions> map = playerActions.get(key);
+            if (!map.containsKey(playerName)) {
+                map.put(playerName, new PlayerChunkInteractions());
+            }
+            PlayerChunkInteractions actions = map.get(playerName);
+
+            actions.breaks = r.nextInt(maxActivity-minActivity)+minActivity;
+            actions.places = r.nextInt(maxActivity-minActivity)+minActivity;
+        }
+    }
+
 
     private static PlayerChunkInteractions getPlayerChunkInteractions(Chunk chunk, Player player) {
         // Im using x,y instead of x,z because the heatmap is 2d, so y is the vertical axis

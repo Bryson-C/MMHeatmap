@@ -64,7 +64,7 @@ public class HeatmapDatabase {
     private void cacheHeatmapLayers() {
         cachedLayers.clear();
         try (Connection connection = dataSource.getConnection()) {
-            PreparedStatement statement = connection.prepareStatement("SELECT `dyn_id`, `dyn_label`, `point_one_coords`, `point_two_coords`, `divisions`, `world_name`, `from_datetime` From `heatmap_layers`");
+            PreparedStatement statement = connection.prepareStatement("SELECT `dyn_id`, `dyn_label`, `point_one_coords`, `point_two_coords`, `divisions`, `world_name`, `poll_range_seconds` From `heatmap_layers`");
             ResultSet result = statement.executeQuery();
 
             while (result.next()) {
@@ -76,7 +76,7 @@ public class HeatmapDatabase {
                         result.getString("point_two_coords"),
                         result.getInt("divisions"),
                         result.getString("world_name"),
-                        result.getString("from_datetime")
+                        result.getInt("poll_range_seconds")
                 );
                 cachedLayers.put(layerName, layer);
             }
@@ -107,7 +107,7 @@ public class HeatmapDatabase {
         try (Connection connection = dataSource.getConnection()) {
             String Sql = "CREATE TABLE IF NOT EXISTS `heatmap_layers` (`id` INT NOT NULL AUTO_INCREMENT ," +
                          " `dyn_id` VARCHAR(32) NOT NULL , `dyn_label` VARCHAR(32) NOT NULL , `point_one_coords` VARCHAR(64) NOT NULL ," +
-                         " `point_two_coords` VARCHAR(64) NOT NULL , `divisions` INT NOT NULL , `world_name` VARCHAR(32) NOT NULL , `from_datetime` DATETIME NOT NULL " +
+                         " `point_two_coords` VARCHAR(64) NOT NULL , `divisions` INT NOT NULL , `world_name` VARCHAR(32) NOT NULL , `poll_range_seconds` INT NOT NULL " +
                          ", PRIMARY KEY (`id`)) ENGINE = InnoDB;";
             PreparedStatement statement = connection.prepareStatement(Sql);
 
@@ -127,7 +127,7 @@ public class HeatmapDatabase {
     private void createPlayerActivityTableIfNotExists() {
         try (Connection connection = dataSource.getConnection()) {
             String Sql = "CREATE TABLE IF NOT EXISTS `player_activity` (`id` INT NOT NULL AUTO_INCREMENT ,"+
-                         " `player_name` VARCHAR(64) NOT NULL , `xy_pos` VARCHAR(64) NOT NULL , `world_name` VARCHAR(64) NOT NULL ,"+
+                         " `player_name` VARCHAR(64) NOT NULL , `xpos` INT NOT NULL, `ypos` INT NOT NULL , `world_name` VARCHAR(64) NOT NULL ," +
                          " `activity_level` INT NOT NULL , `datetime` DATETIME NOT NULL, PRIMARY KEY (`id`)) ENGINE = InnoDB;";
             PreparedStatement statement = connection.prepareStatement(Sql);
 
@@ -177,8 +177,8 @@ public class HeatmapDatabase {
             // This does give a warning that sql injection may occur, but this is not true unless the developer creates a sql injection since the user has no control over the
             // from_datetime field
             PreparedStatement statement = connection.prepareStatement(
-                    "INSERT INTO `heatmap_layers`(`dyn_id`, `dyn_label`, `point_one_coords`, `point_two_coords`, `divisions`, `world_name`, `from_datetime`)"+
-                        " VALUES (?,?,?,?,?,?,'"+layer.fromDateTime+"')");
+                    "INSERT INTO `heatmap_layers`(`dyn_id`, `dyn_label`, `point_one_coords`, `point_two_coords`, `divisions`, `world_name`, `poll_range_seconds`)"+
+                        " VALUES (?,?,?,?,?,?,?)");
 
             statement.setString(1, layer.id);
             statement.setString(2, layer.label);
@@ -186,6 +186,7 @@ public class HeatmapDatabase {
             statement.setString(4, HeatmapLayer.vec2dToString(layer.bottomRight));
             statement.setInt(5, layer.divisions);
             statement.setString(6, layer.world);
+            statement.setInt(7, layer.pollRangeSeconds);
 
             statement.execute();
             // also add the layer to the layer cache
@@ -252,12 +253,14 @@ public class HeatmapDatabase {
         String nowInstant = LocalDateTime.now().format(dateFormat);
 
         try (Connection connection = dataSource.getConnection()) {
-            PreparedStatement statement = connection.prepareStatement("INSERT INTO `player_activity`(`player_name`, `xy_pos`, `world_name`, `activity_level`, `datetime`) VALUES (?,?,?,?,\'"+nowInstant+":00\')");
+            PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO `player_activity`(`player_name`, `xpos`, `ypos`, `world_name`, `activity_level`, `datetime`) VALUES (?,?,?,?,?,'"+nowInstant+":00')");
 
             statement.setString(1, playerName);
-            statement.setString(2, HeatmapLayer.vec2dToString(location));
-            statement.setString(3, world);
-            statement.setInt(4, activity.calculateActivityLevel());
+            statement.setInt(2, (int)location.x);
+            statement.setInt(3, (int)location.y);
+            statement.setString(4, world);
+            statement.setInt(5, activity.calculateActivityLevel());
 
             statement.execute();
 
@@ -281,18 +284,29 @@ public class HeatmapDatabase {
      *       but I figured I'd mention it
      *
      * @param playerName
-     * @param world
+     * @param layer
      * @return
      */
-    public Map<String, Integer> getPlayerActivityEntries(String playerName, String world) {
+    public Map<String, Integer> getPlayerActivityEntriesForLayer(String playerName, HeatmapLayer layer) {
         Map<String, Integer> activity = new HashMap<>();
 
         try (Connection connection = dataSource.getConnection()) {
-            PreparedStatement statement = connection.prepareStatement("SELECT `xy_pos`, `activity_level` from `player_activity`;");
+            String dateString = HeatmapLayer.DateFormat.getDateAsString(HeatmapLayer.DateFormat.getDateNSecondsAgo(HeatmapLayer.DateFormat.nowDate(),layer.pollRangeSeconds));
+            PreparedStatement statement = connection.prepareStatement(
+                    "SELECT `xpos`, `ypos`, `activity_level` from `player_activity` WHERE xpos > ? AND xpos < ? AND ypos > ? AND ypos < ? AND datetime > '"+dateString+"';"
+            );
+
+            statement.setInt(1, (int)layer.topLeft.x);
+            statement.setInt(2, (int)layer.bottomRight.x);
+            statement.setInt(3, (int)layer.topLeft.y);
+            statement.setInt(4, (int)layer.bottomRight.y);
+
+
             ResultSet result = statement.executeQuery();
 
+            // Here is not adding up duplicate areas correctly, it only takes the most recent entries
             while (result.next()) {
-                String key = result.getString("xy_pos");
+                String key = result.getString("xpos")+","+result.getInt("ypos");
                 int activityLevel = result.getInt("activity_level");
                 // if activity in an area already exists, grab that, then add the new activity, and push it back on the map
                 if (activity.containsKey(key))

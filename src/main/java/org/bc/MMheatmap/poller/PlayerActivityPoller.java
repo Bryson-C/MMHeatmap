@@ -2,7 +2,9 @@ package org.bc.MMheatmap.poller;
 
 import io.papermc.paper.util.Tick;
 import net.kyori.adventure.text.Component;
+import org.bc.MMheatmap.HeatmapCommand;
 import org.bc.MMheatmap.HeatmapDatabase;
+import org.bc.MMheatmap.HeatmapLayer;
 import org.bukkit.Server;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
@@ -28,6 +30,13 @@ public class PlayerActivityPoller {
     private static HeatmapDatabase database;
     private static boolean paused = false;
     private static int pollFrequencySeconds;
+    private static int activelyPolledLayers;
+
+    static public void pausePolling() { paused = true; }
+    static public void resumePolling() { paused = false; }
+    static public boolean isPaused() { return paused; }
+    static public int getPollFrequencySeconds() { return pollFrequencySeconds; }
+    static public int getActivelyPolledLayers() { return activelyPolledLayers; }
 
     /**
      * Sets up the poller to be called every N seconds (set in the config)
@@ -51,6 +60,7 @@ public class PlayerActivityPoller {
             // Do not do work if the poller was paused
             if (paused) return;
 
+            PlayerActionListener.generateFakePlayerData(20, 0, 50);
             var playerActions = PlayerActionListener.getPlayerActions();
 
             // Typically I would not recommend using "var", but god do I hate typing collection types
@@ -72,19 +82,26 @@ public class PlayerActivityPoller {
                     double y = Double.parseDouble(chunkStr[1]);
 
                     // Chunk to coords
-                    // FIXME: I THINK MY MATH IS OFF
                     int chunkX = (int)(x*areaSize) - (areaSize/-2);
                     int chunkY = (int)(y*areaSize) - (areaSize/-2);
 
                     Vector2d location = new Vector2d(chunkX, chunkY);
 
+                    // upload all activity
                     database.insertPlayerActivity(playerName, worldName, location, nameInteractionPair.getValue());
-
-                    server.broadcast(Component.text(String.format("%s Interaction In %s: ", playerName, split[1])));
-                    server.broadcast(Component.text(nameInteractionPair.getValue().toString()));
                 }
             }
+            activelyPolledLayers = 0;
+            int dontPollSeconds = config.getInt("defaults.noUpdatePollRangeSeconds");
+            for (HeatmapLayer layer : database.getHeatmapLayers().values()) {
+                // If a layer is set to not be polled, skip over it
+                if (layer.getPollRangeSeconds() == dontPollSeconds) continue;
 
+                activelyPolledLayers++;
+                HeatmapCommand.pollHeatmapCommandFunction(server.getConsoleSender(), layer.getLabel(), "");
+            }
+
+            // clear activity over the period of time
             PlayerActionListener.clearPlayerActions();
 
         } /* End of the lambda */, 0, Tick.tick().fromDuration(Duration.ofSeconds(pollFrequencySeconds)));

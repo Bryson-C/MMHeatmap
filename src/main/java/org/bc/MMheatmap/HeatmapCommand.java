@@ -14,6 +14,7 @@ import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.BlockPositionResolver;
 import io.papermc.paper.math.BlockPosition;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import org.bc.MMheatmap.poller.PlayerActivityPoller;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
@@ -27,6 +28,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -59,6 +61,8 @@ public class HeatmapCommand {
         LiteralArgumentBuilder<CommandSourceStack> commandRoot = Commands.literal("mmheatmap");
 
         // Larger Commands
+
+        // Help Command
         LiteralArgumentBuilder<CommandSourceStack> helpCommand = Commands.literal("help")
             .executes(context -> {
                 CommandSender sender = context.getSource().getSender();
@@ -97,9 +101,8 @@ public class HeatmapCommand {
 
                                 try {
                                     try {
-                                        // FIXME: Change To A Valid Time, Currently, Just Default To Jan 1st, 2026
-                                        String fromDate = "2026-01-01 00:00:00";
-                                        database.insertNewHeatmapLayer(new HeatmapLayer(heatmapName, heatmapName, xyz1, xyz2, divisionCount, world, fromDate));
+                                        int pollRangeSeconds = config.getInt("defaults.pollRangeSeconds");
+                                        database.insertNewHeatmapLayer(new HeatmapLayer(heatmapName, heatmapName, xyz1, xyz2, divisionCount, world, pollRangeSeconds));
 
                                         sender.sendRichMessage("<blue> Dividing World");
                                         MarkerSet set = DynWrapper.getAreaSetOrCreate(heatmapName);
@@ -171,6 +174,51 @@ public class HeatmapCommand {
 
         // polling command
         LiteralArgumentBuilder<CommandSourceStack> pollCommand = Commands.literal("poll")
+            .then(Commands.literal("pollLayer")
+                .then(Commands.argument("name", StringArgumentType.string())
+                    .suggests((ctx, builder) -> {
+                        database.getHeatmapLayers().entrySet().stream()
+                                .filter((entry) -> entry.getKey().toLowerCase().startsWith(builder.getRemainingLowerCase()))
+                                .forEach(x->builder.suggest(x.getKey()));
+                        return builder.buildFuture();
+                    }).then(Commands.argument("arguments", StringArgumentType.greedyString())
+                        // this branch is for when arguments are passed into the function
+                        .executes(context -> {
+                            String args = StringArgumentType.getString(context, "arguments");
+                            String layerName = StringArgumentType.getString(context, "name");
+                            return pollHeatmapCommandFunction(context.getSource().getSender(), layerName, args);
+                        })
+                    // this branch is for when no arguments are provided
+                    ).executes(context -> {
+                        String layerName = StringArgumentType.getString(context, "name");
+                        return pollHeatmapCommandFunction(context.getSource().getSender(), layerName, "");
+                    })
+                )
+            ).then(Commands.literal("pause").executes(context -> {
+                    PlayerActivityPoller.pausePolling();
+                    CommandSender sender = context.getSource().getSender();
+                    sender.sendRichMessage("<b>Pausing Heatmap Polling");
+                    return Command.SINGLE_SUCCESS;
+                })
+            ).then(Commands.literal("resume").executes(context -> {
+                    PlayerActivityPoller.resumePolling();
+                    CommandSender sender = context.getSource().getSender();
+                    sender.sendRichMessage("<b>Resuming Heatmap Polling");
+                    return Command.SINGLE_SUCCESS;
+                })
+            ).then(Commands.literal("info").executes(context -> {
+                    CommandSender sender = context.getSource().getSender();
+                    sender.sendRichMessage("<b>Latest Heatmap Polling Info:");
+                    sender.sendRichMessage("<b><blue>========================");
+                    sender.sendRichMessage("   Layers Polled: <green>" + PlayerActivityPoller.getActivelyPolledLayers());
+                    sender.sendRichMessage("   Poll Frequency: <green>" + PlayerActivityPoller.getPollFrequencySeconds() + " seconds");
+                    sender.sendRichMessage("   Paused: <green>" + PlayerActivityPoller.isPaused());
+                    return Command.SINGLE_SUCCESS;
+                })
+            );
+
+        // Modify Command
+        LiteralArgumentBuilder<CommandSourceStack> modifyCommand = Commands.literal("modify")
             .then(Commands.argument("name", StringArgumentType.string())
                 .suggests((ctx, builder) -> {
                     database.getHeatmapLayers().entrySet().stream()
@@ -179,36 +227,13 @@ public class HeatmapCommand {
                     return builder.buildFuture();
                 }).then(Commands.argument("arguments", StringArgumentType.greedyString())
                     // this branch is for when arguments are passed into the function
-                    .executes(context -> pollHeatmapCommandFunction(context, StringArgumentType.getString(context, "arguments")))
-                // this branch is for when no arguments are provided
-                ).executes(context -> pollHeatmapCommandFunction(context, ""))
-            );
-
-
-        // Testing Getting Specific Tile From Position
-        LiteralArgumentBuilder<CommandSourceStack> getCellFromPos = Commands.literal("heatmapCellFromPos")
-            .then(Commands.argument("name", StringArgumentType.string())
-            .suggests((ctx, builder) -> {
-                        database.getHeatmapLayers().entrySet().stream()
-                                .filter((entry) -> entry.getKey().toLowerCase().startsWith(builder.getRemainingLowerCase()))
-                                .forEach(x->builder.suggest(x.getKey()));
-                        return builder.buildFuture();
-                    })
-                .then(Commands.argument("position", ArgumentTypes.blockPosition())
                     .executes(context -> {
+                        String layerName = StringArgumentType.getString(context, "name");
+                        String args = StringArgumentType.getString(context, "arguments");
                         CommandSender sender = context.getSource().getSender();
 
-                        BlockPositionResolver resolver = context.getArgument("position", BlockPositionResolver.class);
-                        BlockPosition pos = resolver.resolve(context.getSource());
-                        Vector2d at = new Vector2d(pos.x(),pos.z());
-
-                        String layerName = StringArgumentType.getString(context, "name");
-
-                        HeatmapLayer layer = database.getHeatmapLayers().get(layerName);
-
-                        int[] cellIndex = DynWrapper.getDividedWorldCellFromPosition(layer.topLeft, layer.bottomRight, layer.divisions, at);
-
-                        sender.sendRichMessage("Cell Of <red>" + at.x() + "<reset>, <green>" + at.y() + "<reset>: (" + cellIndex[0] + ", " + cellIndex[1] + ")");
+                        sender.sendRichMessage("<green><b>TODO: ADD MODIFY COMMAND");
+                        sender.sendRichMessage("<b>Args: <reset>"+args);
 
                         return Command.SINGLE_SUCCESS;
                     })
@@ -267,13 +292,13 @@ public class HeatmapCommand {
         commandRoot.then(createHeatmap);
 
         LiteralArgumentBuilder<CommandSourceStack> getCommand = Commands.literal("get");
-        getCommand.then(getCellFromPos);
         getCommand.then(getHeatmapLayers);
 
         commandRoot.then(getCommand);
         commandRoot.then(deleteLayer);
         commandRoot.then(pollCommand);
         commandRoot.then(resyncCommand);
+        commandRoot.then(modifyCommand);
         commandRoot.then(helpCommand);
 
         // Build command
@@ -295,14 +320,13 @@ public class HeatmapCommand {
      * The context comes from the ".execute(...)" part of the command tree. Args must be passed in as they will not
      * be gotten from the inside of this function.
      *
-     * @param context The command context from the command ".execute(...)" part of the command tree
+     * @param sender
+     * @param layerName
      * @param args A greedy string of args formatted as such: "key:value key2:value2 ... keyN:valueN".
      *             An empty string may be used if no arguments are needed
      * @return returns the command success code, generally SINGLE_SUCCESS (or 1)
      */
-    private int pollHeatmapCommandFunction(CommandContext<CommandSourceStack> context, String args) {
-        CommandSender sender = context.getSource().getSender();
-
+    static public int pollHeatmapCommandFunction(CommandSender sender, String layerName, String args) {
         String[] argKVPairs = args.split(" ");
 
         for (var kv : argKVPairs) {
@@ -315,19 +339,15 @@ public class HeatmapCommand {
         Runnable run = ()->{
             long startTime = System.nanoTime();
 
-            String layerName = StringArgumentType.getString(context, "name");
             HeatmapLayer layer = database.getHeatmapLayers().get(layerName);
 
-
-            ArrayList<Vector2d> activePoints = new ArrayList<>();
-
-
-
-
+            // recreate set
             MarkerSet set = DynWrapper.getAreaSetOrCreate(layerName);
-            DynWrapper.createActiveHeatmapCellsFromCoords(layer, set, database.getPlayerActivityEntries("player", layer.world), "");
 
-            sender.sendRichMessage("<color:#30f000> Done! (" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-startTime) + "ms)");
+            DynWrapper.createActiveHeatmapCellsFromCoords(layer, set, database.getPlayerActivityEntriesForLayer("player", layer), "");
+
+            if (config.getBoolean("defaults.logPollTime"))
+                sender.sendRichMessage("<color:#30f000> Heatmap Polling Completed! (" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-startTime) + "ms)");
         };
 
         new Thread(run).start();
