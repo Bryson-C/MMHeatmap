@@ -6,7 +6,6 @@ import com.zaxxer.hikari.HikariDataSource;
 import org.bc.MMheatmap.poller.PlayerChunkInteractions;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.joml.Vector2d;
-import org.joml.Vector3d;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -22,17 +21,18 @@ import java.util.*;
  * - database.username
  * - database.password
  *
+ * Note: The database is not responsible for threading, this means that its no longer an implementation issue, but a skill issue:
+ *       it's called passing blame, and it works
+ *
  * @author BC/Exo
  */
 public class HeatmapDatabase {
-    // FIXME: DO THREADED DATABASE LOOKUPS
-    // Coreprotect /co l example: https://github.com/PlayPro/CoreProtect/blob/master/src/main/java/net/coreprotect/command/LookupCommand.java#L598
-
     private static HikariDataSource dataSource;
+
     // try to keep this up to date with each deletion and insertion of the database,
     // this will save a lot of time
-    // TODO: Find a way to control which maps are updated automatically and which are manually updated
     private static Map<String, HeatmapLayer> cachedLayers = new HashMap<>();
+    // Try to keep this up to date, we can use a binary search to increase query speeds (I believe)
 
     /**
      * Creates a database data source from a given config file
@@ -52,7 +52,7 @@ public class HeatmapDatabase {
         config.addDataSourceProperty("", ""); // MISC settings to add
 
         dataSource = new HikariDataSource(config);
-        resyncHeatmapLayers();
+        resyncHeatmapDatabase();
     }
 
     /**
@@ -86,6 +86,7 @@ public class HeatmapDatabase {
         }
     }
 
+
     /**
      * Returns the cached database layers, shouldn't become unsynced from the database, but in case it does,
      * "HeatmapDatabase.cachedHeatmapLayers()" should be called internally or for external resyncing call
@@ -107,8 +108,8 @@ public class HeatmapDatabase {
         try (Connection connection = dataSource.getConnection()) {
             String Sql = "CREATE TABLE IF NOT EXISTS `heatmap_layers` (`id` INT NOT NULL AUTO_INCREMENT ," +
                          " `dyn_id` VARCHAR(32) NOT NULL , `dyn_label` VARCHAR(32) NOT NULL , `point_one_coords` VARCHAR(64) NOT NULL ," +
-                         " `point_two_coords` VARCHAR(64) NOT NULL , `divisions` INT NOT NULL , `world_name` VARCHAR(32) NOT NULL , `poll_range_seconds` INT NOT NULL " +
-                         ", PRIMARY KEY (`id`)) ENGINE = InnoDB;";
+                         " `point_two_coords` VARCHAR(64) NOT NULL , `divisions` INT NOT NULL , `world_name` VARCHAR(32) NOT NULL , `poll_range_seconds` INT NOT NULL, " +
+                         " `fromToDate` VARCHAR(48) NOT NULL, PRIMARY KEY (`id`)) ENGINE = InnoDB;";
             PreparedStatement statement = connection.prepareStatement(Sql);
 
             statement.execute();
@@ -138,14 +139,31 @@ public class HeatmapDatabase {
         }
     }
 
+
     /**
      * Clears the cached layers, then creates the cache
      */
-    public void resyncHeatmapLayers() {
+    public void resyncHeatmapDatabase() {
         createLayerTableIfNotExists();
         createPlayerActivityTableIfNotExists();
         cacheHeatmapLayers();
     }
+
+
+    interface HeatmapSqlFunction<T> {
+        T run(Connection connection);
+    }
+
+    public <T> T executeSql(HeatmapSqlFunction<T> function) {
+        try (Connection connection = dataSource.getConnection()) {
+            return function.run(connection);
+        } catch (Exception e) {
+            // Handle any exceptions that arise from getting / handing the exception
+            System.err.println("Failed Running Database Query: " + e.getMessage());
+        }
+        return null;
+    }
+
 
     /**
      * Used to notify that a layer under some name already exists
@@ -167,7 +185,7 @@ public class HeatmapDatabase {
      *
      * @throws DuplicateLayerException When layer already exists within the database
      */
-    public void insertNewHeatmapLayer(HeatmapLayer layer) throws DuplicateLayerException {
+    public void insertNewHeatmapLayer(HeatmapLayer layer, String fromDate, String toDate) throws DuplicateLayerException {
         // first, check to see if a layer already exists, if so, throw DuplicateLayerException, and handle the error in the heatmap command
         if (getHeatmapLayers().containsKey(layer.label)) {
             throw new DuplicateLayerException("Another layer of the same name exists");
@@ -177,8 +195,7 @@ public class HeatmapDatabase {
             // This does give a warning that sql injection may occur, but this is not true unless the developer creates a sql injection since the user has no control over the
             // from_datetime field
             PreparedStatement statement = connection.prepareStatement(
-                    "INSERT INTO `heatmap_layers`(`dyn_id`, `dyn_label`, `point_one_coords`, `point_two_coords`, `divisions`, `world_name`, `poll_range_seconds`)"+
-                        " VALUES (?,?,?,?,?,?,?)");
+                    "INSERT INTO `heatmap_layers`(`dyn_id`, `dyn_label`, `point_one_coords`, `point_two_coords`, `divisions`, `world_name`, `poll_range_seconds`, `fromToDate`) VALUES (?,?,?,?,?,?,?,?)");
 
             statement.setString(1, layer.id);
             statement.setString(2, layer.label);
@@ -187,6 +204,7 @@ public class HeatmapDatabase {
             statement.setInt(5, layer.divisions);
             statement.setString(6, layer.world);
             statement.setInt(7, layer.pollRangeSeconds);
+            statement.setString(8, fromDate+","+toDate);
 
             statement.execute();
             // also add the layer to the layer cache
@@ -283,24 +301,24 @@ public class HeatmapDatabase {
      * NOTE: Since maps do not support duplicate keys, more processing is required to make sure all data is included, not a big deal, nor is it really worth bringing up,
      *       but I figured I'd mention it
      *
-     * @param playerName
      * @param layer
      * @return
      */
-    public Map<String, Integer> getPlayerActivityEntriesForLayer(String playerName, HeatmapLayer layer) {
+    public Map<String, Integer> getPlayerActivityEntriesForLayer(HeatmapLayer layer) {
         Map<String, Integer> activity = new HashMap<>();
 
         try (Connection connection = dataSource.getConnection()) {
             String dateString = HeatmapLayer.DateFormat.getDateAsString(HeatmapLayer.DateFormat.getDateNSecondsAgo(HeatmapLayer.DateFormat.nowDate(),layer.pollRangeSeconds));
             PreparedStatement statement = connection.prepareStatement(
-                    "SELECT `xpos`, `ypos`, `activity_level` from `player_activity` WHERE xpos > ? AND xpos < ? AND ypos > ? AND ypos < ? AND datetime > '"+dateString+"';"
+                    "SELECT `xpos`, `ypos`, `activity_level` from `player_activity` WHERE" +
+                        " xpos > ? AND xpos < ? AND ypos > ? AND ypos < ? AND datetime >= '"+dateString+"' AND world_name = ?;"
             );
 
             statement.setInt(1, (int)layer.topLeft.x);
             statement.setInt(2, (int)layer.bottomRight.x);
             statement.setInt(3, (int)layer.topLeft.y);
             statement.setInt(4, (int)layer.bottomRight.y);
-
+            statement.setString(5, layer.world);
 
             ResultSet result = statement.executeQuery();
 
@@ -318,6 +336,84 @@ public class HeatmapDatabase {
         } catch (Exception e) {
             // Handle any exceptions that arise from getting / handing the exception
             System.err.println("Failed Running Database Query: " + e.getMessage());
+        }
+
+        return activity;
+    }
+
+    public Map<String, Integer> getPlayerActivityEntriesForLayerInArea(HeatmapLayer layer, Vector2d xy1, Vector2d xy2) {
+        Map<String, Integer> activity = new HashMap<>();
+
+        try (Connection connection = dataSource.getConnection()) {
+            String dateString = HeatmapLayer.DateFormat.getDateAsString(HeatmapLayer.DateFormat.getDateNSecondsAgo(HeatmapLayer.DateFormat.nowDate(),layer.pollRangeSeconds));
+            PreparedStatement statement = connection.prepareStatement(
+                    "SELECT `xpos`, `ypos`, `activity_level` from `player_activity` WHERE" +
+                            " xpos > ? AND xpos < ? AND ypos > ? AND ypos < ? AND datetime >= '"+dateString+"' AND world_name = ?;"
+            );
+
+            statement.setInt(1, (int)xy1.x);
+            statement.setInt(2, (int)xy2.x);
+            statement.setInt(3, (int)xy1.y);
+            statement.setInt(4, (int)xy2.y);
+            statement.setString(5, layer.world);
+
+            ResultSet result = statement.executeQuery();
+
+            // Here is not adding up duplicate areas correctly, it only takes the most recent entries
+            while (result.next()) {
+                String key = result.getString("xpos")+","+result.getInt("ypos");
+                int activityLevel = result.getInt("activity_level");
+                // if activity in an area already exists, grab that, then add the new activity, and push it back on the map
+                if (activity.containsKey(key))
+                    activityLevel += activity.get(key);
+                // this is the case that always run, regardless if the activity area exists or not, the data (either new or updated) will be pushed back
+                activity.put(key, activityLevel);
+            }
+
+        } catch (Exception e) {
+            // Handle any exceptions that arise from getting / handing the exception
+            System.err.println("Failed Running Database Query: " + e.getMessage());
+        }
+
+        return activity;
+    }
+
+    public Map<String, Integer> getPlayerActivityEntriesForLayerBetweenDates(HeatmapLayer layer, String fromDate, String toDate) {
+        Map<String, Integer> activity = new HashMap<>();
+
+        try (Connection connection = dataSource.getConnection()) {
+            String f = fromDate.replace("\"","");
+            String t = toDate.replace("\"","");
+            PreparedStatement statement = connection.prepareStatement(
+                    "SELECT `xpos`, `ypos`, `activity_level` from `player_activity` WHERE" +
+                        " xpos > ? AND xpos < ? AND ypos > ? AND ypos < ? AND datetime >= '"+f+"' AND datetime <= '"+t+"' AND world_name = ?;"
+            );
+
+            statement.setInt(1, (int)layer.topLeft.x);
+            statement.setInt(2, (int)layer.bottomRight.x);
+            statement.setInt(3, (int)layer.topLeft.y);
+            statement.setInt(4, (int)layer.bottomRight.y);
+            statement.setString(5, layer.world);
+
+            System.out.println("Query: "+statement);
+
+            ResultSet result = statement.executeQuery();
+
+            // Here is not adding up duplicate areas correctly, it only takes the most recent entries
+            while (result.next()) {
+                String key = result.getString("xpos")+","+result.getInt("ypos");
+                int activityLevel = result.getInt("activity_level");
+                // if activity in an area already exists, grab that, then add the new activity, and push it back on the map
+                if (activity.containsKey(key))
+                    activityLevel += activity.get(key);
+                // this is the case that always run, regardless if the activity area exists or not, the data (either new or updated) will be pushed back
+                activity.put(key, activityLevel);
+            }
+
+        } catch (Exception e) {
+            // Handle any exceptions that arise from getting / handing the exception
+            System.err.println("Failed Running Database Query: " + e.getMessage());
+            System.err.println("If Query Failed, Double Check Time Format Is \"yyyy-mm-dd hh:mm:ss\"");
         }
 
         return activity;

@@ -8,6 +8,7 @@ import org.joml.Vector2d;
 import org.joml.Vector3d;
 
 import java.awt.*;
+import java.awt.geom.Area;
 import java.io.File;
 import java.util.*;
 
@@ -75,7 +76,7 @@ public class DynWrapper {
      * @param b the amount of blue from 0 - 255
      * @return returns the red, green, blue color as a packed integer
      */
-    private static int rgbToInteger(int r, int g, int b) {
+    public static int rgbToInteger(int r, int g, int b) {
         return ((r&0x0ff)<<16)|((g&0x0ff)<<8)|(b&0x0ff);
     }
 
@@ -84,7 +85,7 @@ public class DynWrapper {
      * @param c The color to be transformed to a packed integer
      * @return Returns a packed integer from a color `c`
      */
-    private static int colorToInteger(Color c) {
+    public static int colorToInteger(Color c) {
         return rgbToInteger(c.getRed(), c.getGreen(), c.getBlue());
     }
 
@@ -96,7 +97,7 @@ public class DynWrapper {
      *
      * @see java.awt.Color
      */
-    private static Color hexToColor(String hexCode) {
+    public static Color hexToColor(String hexCode) {
         return Color.decode(hexCode);
     }
 
@@ -233,14 +234,14 @@ public class DynWrapper {
     /**
      * TODO: Implement Filters So That The Entire Database Is Not Queried At Once
      *
-     *
-     *
      * @param layer
      * @param set The set to add the markers to, the set will be cleared before usage to avoid errors caused by duplicate ids
      * @param points
      * @param flags
      */
     public static void createActiveHeatmapCellsFromCoords(HeatmapLayer layer, MarkerSet set, Map<String, Integer> points, String flags) {
+        if (points.isEmpty()) { return; }
+
         // clear area first to avoid duplicate cell errors
         DynWrapper.deleteAreaSet(layer.label);
         set = getAreaSetOrCreate(layer.label);
@@ -279,6 +280,8 @@ public class DynWrapper {
 
             deDuplicateMap.put(key, activity);
         }
+        layer.maxActivity = maxActivity;
+        layer.minActivity = minActivity;
 
 
         for (Map.Entry<String, Integer> kv : deDuplicateMap.entrySet()) {
@@ -293,8 +296,10 @@ public class DynWrapper {
             double[] xy1 = new double[]{(index[0]*cellSizeWidth)-(width/2), ((index[0]*cellSizeWidth) + cellSizeWidth)-(width/2)};
             double[] xy2 = new double[]{(index[1]*cellSizeHeight)-(height/2), (((index[1]*cellSizeHeight) + cellSizeHeight))-(height/2)};
 
+
             // id, label, processLabelAsHtml, world, [list of x coords], [list of y coords], persistent
-            AreaMarker marker = set.createAreaMarker(index[0]+","+index[1], "Cell " + index[0] + ", " +index[1], false, layer.world, xy1, xy2, true);
+            AreaMarker marker = set.createAreaMarker(index[0] + "," + index[1], "Cell " + index[0] + ", " + index[1], false, layer.world, xy1, xy2, true);
+
 
             // formula for interpolating colors in n-sized rank 1 array
             // Math from: https://computergraphics.stackexchange.com/questions/3801/how-can-you-interpolate-over-an-array-of-say-5-colors
@@ -317,11 +322,95 @@ public class DynWrapper {
             if (marker != null) {
                 marker.setFillStyle(config.getDouble("colors.cellOpacity"), colorToInteger(c));
                 marker.setLineStyle(1, config.getDouble("colors.borderOpacity"), colorToInteger(hexToColor(config.getString("colors.borderColor"))));
-                marker.setDescription("Activity: " + kv.getValue());
+                marker.setDescription("Cell ("+index[0]+", "+index[1]+") Activity: " + kv.getValue());
             } else {
                 System.err.println("Error styling area marker, marker is null");
             }
         }
     }
 
+    public static void updateHeatmapCellsInRange(HeatmapLayer layer, MarkerSet set, Map<String, Integer> points, String flags) {
+        if (points.isEmpty()) { return; }
+        // Setting min to the max, and max to the min, will ensure these values will always be set so long as there is more than 1 point
+        // we do this in a separate loop so that we can apply the correct color coating to the cells and avoid doing more math than necessary.
+        // Here we also need to combine nearby areas if they will both be included inside the same heatmap tile, this is to avoid duplicate errors
+        int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE;
+        Map<String, Integer> deDuplicateMap = new HashMap<>();
+        for (Map.Entry<String, Integer> kv : points.entrySet()) {
+            String[] p1 = kv.getKey().strip().split(",");
+            double x = Double.parseDouble(p1[0]), y = Double.parseDouble(p1[1]);
+            int[] index = getDividedWorldCellFromPosition(layer.topLeft, layer.bottomRight, layer.divisions, new Vector2d(x, y));
+
+            minX = Math.min(index[0], minX);
+            minY = Math.min(index[1], minY);
+            maxX = Math.max(index[0], maxX);
+            maxY = Math.max(index[1], maxY);
+
+            int activity = kv.getValue();
+            String key = String.format("%d,%d", index[0],index[1]);
+            if (deDuplicateMap.containsKey(key)) {
+                activity += deDuplicateMap.get(key);
+            }
+
+            deDuplicateMap.put(key, activity);
+        }
+
+        // get coords in an easier format
+        double x1 = layer.topLeft.x(), z1 = layer.topLeft.y();
+        double x2 = layer.bottomRight.x(), z2 = layer.bottomRight.y();
+
+        // use math to get total size of area (in 2d, y coordinate doesnt matter)
+        double width = Math.abs(x1-x2);
+        double height = Math.abs(z1-z2);
+
+        // get the amount of space each tile should take in the full area
+        double cellSizeWidth = (width/layer.divisions);
+        double cellSizeHeight = (height/layer.divisions);
+
+        for (Map.Entry<String, Integer> kv : deDuplicateMap.entrySet()) {
+
+            // Here, the area index has already been created from the above loop, so we just need to split it up again, no more parsing required!
+            String[] p1 = kv.getKey().strip().split(",");
+            int[] index = { Integer.parseInt(p1[0]), Integer.parseInt(p1[1]) };
+
+            //area marker format
+            //x: [x1, x2, ... xN]
+            //y: [y1, y2, ... yN]
+            double[] xy1 = new double[]{(index[0]*cellSizeWidth)-(width/2), ((index[0]*cellSizeWidth) + cellSizeWidth)-(width/2)};
+            double[] xy2 = new double[]{(index[1]*cellSizeHeight)-(height/2), (((index[1]*cellSizeHeight) + cellSizeHeight))-(height/2)};
+
+            AreaMarker marker = set.findAreaMarker(index[0]+","+index[1]);
+            if (marker == null) {
+                // id, label, processLabelAsHtml, world, [list of x coords], [list of y coords], persistent
+                marker = set.createAreaMarker(index[0] + "," + index[1], "Cell " + index[0] + ", " + index[1], false, layer.world, xy1, xy2, true);
+            }
+
+            // formula for interpolating colors in n-sized rank 1 array
+            // Math from: https://computergraphics.stackexchange.com/questions/3801/how-can-you-interpolate-over-an-array-of-say-5-colors
+            // and: https://math.stackexchange.com/questions/754130/find-what-percent-x-is-between-two-numbers
+
+            // get percentage between minActivity to maxActivity
+            int activity = kv.getValue();
+            double percentage = (activity - layer.minActivity)/(double)(layer.maxActivity - layer.minActivity);
+
+            // get the 2 colors in the array to interpolate between
+            int t1 = Math.clamp((int)Math.floor(percentage * colors.size()), 0, colors.size()-1);
+            int t2 = Math.clamp((int)Math.ceil(percentage * colors.size()), 0, colors.size()-1);
+
+            // get the amount of color to apply
+            double amount = percentage-(t1/(double)colors.size());
+            Color c = lerpRGB(colors.get(t1), colors.get(t2), amount);
+
+            // finally, set the color
+            // marker may be null if the area already exists under the dynmap id
+            if (marker != null) {
+                marker.setFillStyle(config.getDouble("colors.cellOpacity"), colorToInteger(c));
+                marker.setLineStyle(1, config.getDouble("colors.borderOpacity"), colorToInteger(hexToColor(config.getString("colors.borderColor"))));
+                marker.setDescription("Cell ("+index[0]+", "+index[1]+") Activity: " + kv.getValue());
+            } else {
+                System.err.println("Error styling area marker, marker is null");
+            }
+        }
+
+    }
 }

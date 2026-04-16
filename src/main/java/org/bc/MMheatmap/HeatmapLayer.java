@@ -24,6 +24,14 @@ public class HeatmapLayer {
     // to poll player date over. Given a really large number, all data will be present, otherwise, it will represent the time from
     // now to N seconds ago, where N is `pollRangeSeconds`
     int pollRangeSeconds;
+    // These is not gotten from the database, its calculated on layer creation/recreation
+    int maxActivity = Integer.MIN_VALUE, minActivity = Integer.MAX_VALUE;
+
+
+    // In the database, there is a field for "fromToDate", we dont need to save that information because it will not be used real time.
+    // The only case where the "fromToDate" will be used is on creation of the layer, or in the case that the heatmap layer information needs
+    // to be printed
+
 
     /**
      * A class which formats dates for heatmap layers.
@@ -31,7 +39,7 @@ public class HeatmapLayer {
       */
     static public class DateFormat {
         static public String getDateAsString(LocalDateTime date) {
-            return date.format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"));
+            return date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         }
         static public LocalDateTime nowDate() {
             return LocalDateTime.now();

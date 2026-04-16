@@ -35,7 +35,7 @@ public final class MMheatmap extends JavaPlugin {
         // Enable Command
         this.getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, commands -> {
             // Command's variables are static, they don't need an object to pass around the command after it is created once...
-            new HeatmapCommand(wrapper, database, getConfig());
+            new HeatmapCommand(database, getConfig());
             // ^ this allows to just pass in the HeatmapCommand as a static class
             commands.registrar().register(HeatmapCommand.getBuiltCommand());
         });

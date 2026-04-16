@@ -1,7 +1,7 @@
 database:
-  address: ''
-  username: ''
-  password: ''
+  address: 'jdbc:mysql://address/database'
+  username: 'username'
+  password: 'password'
 
 defaults:
   world_name: 'world'
@@ -18,6 +18,8 @@ defaults:
   # if the poll range is not given by a command/parameter (i.e. this is the default)
   # value = INT_MAX-1
   pollRangeSeconds: 2147483646
+  # If a command with "divisionCount" is ran with a number greater than this, a warning will be sent to the command sender
+  divisionDensityWarningCount: 128
 
 colors:
   # https://cssgradient.io/ for the gradients
@@ -25,3 +27,25 @@ colors:
   cellOpacity: 0.50
   borderColor: '#E0E0E0'
   borderOpacity: 0.70
+  heatmapBaseLayerColor: '#0F7299'
+  heatmapBaseLayerOpacity: 0.05
+
+# to disable, enter 0, otherwise, the weight will be added per action
+activityWeights:
+  playerPlace: 1
+  playerBreak: 1
+  playerSetSpawn: 1.5
+  playerBedEnter: 0.5
+  playerLeaveBed: 0
+  playerChangeBeaconEffect: 1
+  playerChangedWorldEvent: 1
+  playerFishEvent: 0
+  playerFlowerPotManipulateEvent: 0.5
+  playerArmorStandManipulateEvent: 0.5
+  playerHarvestBlockEvent: 0.75
+  playerInsertLecternEvent: 0
+  playerItemFrameChangeEvent: 0
+  playerPurchaseEvent: 0.25
+  playerShearBlockEvent: 1
+  playerShearEntityEvent: 0
+  playerTakeLecternBookEvent: 0

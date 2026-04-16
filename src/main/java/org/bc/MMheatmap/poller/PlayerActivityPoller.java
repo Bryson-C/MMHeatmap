@@ -60,7 +60,7 @@ public class PlayerActivityPoller {
             // Do not do work if the poller was paused
             if (paused) return;
 
-            PlayerActionListener.generateFakePlayerData(20, 0, 50);
+            PlayerActionListener.generateFakePlayerData(500, 0, 200);
             var playerActions = PlayerActionListener.getPlayerActions();
 
             // Typically I would not recommend using "var", but god do I hate typing collection types
@@ -98,7 +98,7 @@ public class PlayerActivityPoller {
                 if (layer.getPollRangeSeconds() == dontPollSeconds) continue;
 
                 activelyPolledLayers++;
-                HeatmapCommand.pollHeatmapCommandFunction(server.getConsoleSender(), layer.getLabel(), "");
+                HeatmapCommand.pollHeatmapCommandFunction(server.getConsoleSender(), layer.getLabel(), null, null);
             }
 
             // clear activity over the period of time

@@ -7,14 +7,14 @@ package org.bc.MMheatmap.poller;
  *  @author BC/Exo
  */
 public class PlayerChunkInteractions {
-    int places, breaks;
+    double activity;
 
     /**
      * @see String#toString()
      */
     @Override
     public String toString() {
-        return String.format("Blocks: %d placed, %d broken", places, breaks);
+        return String.format("Current Activity: %.2f", activity);
     }
 
     /**
@@ -25,7 +25,7 @@ public class PlayerChunkInteractions {
      * @return Returns a Bukkit formated rich string for color support
      */
     public String toRichMessage() {
-        return String.format("Blocks: <green>%d placed<reset>, <red>%d broken", places, breaks);
+        return String.format("Activity: <green>%.2f", activity);
     }
 
     /**
@@ -46,6 +46,6 @@ public class PlayerChunkInteractions {
      * @return returns an activity score if above a threshold (determined by codebase user), otherwise 0
      */
     public int calculateActivityLevel() {
-        return places + breaks;
+        return (int)Math.floor(activity);
     }
 }
