@@ -35,6 +35,7 @@ import java.util.Random;
  */
 public class PlayerActionListener implements Listener {
 
+    static FileConfiguration config;
     // The area to record over, so for instance, 1 means 1x1 chunks, 3 would mean a 3x3 chunk area
     static public int chunksSq;
     static public double playerPlaceWeight;
@@ -60,6 +61,7 @@ public class PlayerActionListener implements Listener {
      * @param config The config file with the action weights inside
      */
     PlayerActionListener(FileConfiguration config) {
+        // load weights so we aren't reading from files constantly
         PlayerActionListener.chunksSq = config.getInt("defaults.pollAreaChunkSize");
         PlayerActionListener.playerPlaceWeight = config.getDouble("activityWeights.playerPlace");
         PlayerActionListener.playerBreakWeight = config.getDouble("activityWeights.playerBreak");
@@ -78,8 +80,7 @@ public class PlayerActionListener implements Listener {
         PlayerActionListener.playerShearBlockEventWeight = config.getDouble("activityWeights.playerShearBlockEvent");
         PlayerActionListener.playerShearEntityEventWeight = config.getDouble("activityWeights.playerShearEntityEvent");
         PlayerActionListener.playerTakeLecternBookEventWeight = config.getDouble("activityWeights.playerTakeLecternBookEvent");
-        System.out.println("ChunksSQ: " + chunksSq);
-        // load weights so we aren't reading from files constantly
+        PlayerActionListener.config = config;
     }
 
     // Optimize memory, or make sure that memory doesn't get to insane
@@ -102,7 +103,7 @@ public class PlayerActionListener implements Listener {
             }
             Map<String, PlayerChunkInteractions> map = playerActions.get(key);
             if (!map.containsKey(playerName)) {
-                map.put(playerName, new PlayerChunkInteractions());
+                map.put(playerName, new PlayerChunkInteractions(config));
             }
             PlayerChunkInteractions actions = map.get(playerName);
 
@@ -125,7 +126,7 @@ public class PlayerActionListener implements Listener {
         }
         Map<String, PlayerChunkInteractions> map = playerActions.get(key);
         if (!map.containsKey(player.getName())) {
-            map.put(player.getName(), new PlayerChunkInteractions());
+            map.put(player.getName(), new PlayerChunkInteractions(config));
         }
 
         PlayerChunkInteractions actions = map.get(player.getName());
