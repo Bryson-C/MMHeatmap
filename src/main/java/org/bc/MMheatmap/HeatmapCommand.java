@@ -280,7 +280,7 @@ public class HeatmapCommand {
             .then(Commands.literal("pollLayer")
                 .then(Commands.argument("name", StringArgumentType.string())
                     .suggests((ctx, builder) -> { database.getHeatmapLayers().entrySet().stream().filter((entry) -> entry.getKey().toLowerCase().startsWith(builder.getRemainingLowerCase())).forEach(x->builder.suggest(x.getKey())); return builder.buildFuture();})
-                        .requires(sender -> sender.getSender().hasPermission("mmheatmap.pollLayer"))
+                        .requires(sender -> sender.getSender().hasPermission("mmheatmap.poll.pollLayer"))
                         // this branch is for when no arguments are provided
                         .executes(context -> {
                             String layerName = StringArgumentType.getString(context, "name");
@@ -292,7 +292,7 @@ public class HeatmapCommand {
                 .then(Commands.argument("name", StringArgumentType.string())
                     .suggests((ctx, builder) -> { database.getHeatmapLayers().entrySet().stream().filter((entry) -> entry.getKey().toLowerCase().startsWith(builder.getRemainingLowerCase())).forEach(x->builder.suggest(x.getKey())); return builder.buildFuture();})
                     .then(Commands.argument("x1", IntegerArgumentType.integer()).then(Commands.argument("y1", IntegerArgumentType.integer()).then(Commands.argument("x2", IntegerArgumentType.integer()).then(Commands.argument("y2", IntegerArgumentType.integer())
-                        .requires(sender -> sender.getSender().hasPermission("mmheatmap.pollArea"))
+                        .requires(sender -> sender.getSender().hasPermission("mmheatmap.poll.pollArea"))
                         .executes(context -> {
 
                             String layername = StringArgumentType.getString(context, "name");
@@ -370,7 +370,7 @@ public class HeatmapCommand {
                 .suggests((ctx, builder) -> {database.getHeatmapLayers().entrySet().stream().filter((entry) -> entry.getKey().toLowerCase().startsWith(builder.getRemainingLowerCase())).forEach(x->builder.suggest(x.getKey()));return builder.buildFuture();})
                 .then(Commands.literal("points")
                     .then(Commands.argument("x1", IntegerArgumentType.integer()).then(Commands.argument("y1", IntegerArgumentType.integer()).then(Commands.argument("x2", IntegerArgumentType.integer()).then(Commands.argument("y2", IntegerArgumentType.integer())
-                        .requires(sender -> sender.getSender().hasPermission("mmheatmap.modify"))
+                        .requires(sender -> sender.getSender().hasPermission("mmheatmap.modify.points"))
                         .executes(context -> {
                             Runnable r = () -> {
                                 String layerName = StringArgumentType.getString(context, "name");
@@ -432,7 +432,7 @@ public class HeatmapCommand {
                 .then(Commands.literal("dateRange")
                     .then(Commands.argument("startdate", StringArgumentType.string())
                         .then(Commands.argument("enddate", StringArgumentType.string())
-                            .requires(sender -> sender.getSender().hasPermission("mmheatmap.modify"))
+                            .requires(sender -> sender.getSender().hasPermission("mmheatmap.modify.dateRange"))
                             .executes(context -> {
 
                                 String layerName = StringArgumentType.getString(context, "name");
@@ -482,7 +482,7 @@ public class HeatmapCommand {
                 )
                 .then(Commands.literal("relativeTimePeriod")
                     .then(Commands.argument("relativetimeperiod", StringArgumentType.string())
-                        .requires(sender -> sender.getSender().hasPermission("mmheatmap.modify"))
+                        .requires(sender -> sender.getSender().hasPermission("mmheatmap.modify.relativeTimePeriod"))
                         .executes(context -> {
 
                             Runnable r = () -> {
@@ -532,7 +532,7 @@ public class HeatmapCommand {
                 )
                 .then(Commands.literal("divisions")
                     .then(Commands.argument("divisions", IntegerArgumentType.integer(1))
-                        .requires(sender -> sender.getSender().hasPermission("mmheatmap.modify"))
+                        .requires(sender -> sender.getSender().hasPermission("mmheatmap.modify.divisions"))
                         .executes(context -> {
 
                             Runnable r = () -> {
@@ -568,7 +568,7 @@ public class HeatmapCommand {
 
         // Get/List Heatmap Layers
         LiteralArgumentBuilder<CommandSourceStack> getHeatmapLayers = Commands.literal("heatmapLayers")
-            .requires(sender -> sender.getSender().hasPermission("mmheatmap.getLayers"))
+            .requires(sender -> sender.getSender().hasPermission("mmheatmap.info.heatmapLayers"))
             .executes(context -> {
 
                 CommandSender sender = context.getSource().getSender();
@@ -645,7 +645,7 @@ public class HeatmapCommand {
 
         commandRoot.then(infoCommand);
 
-        commandRoot.requires(sender -> sender.getSender().hasPermission("mmheatmap.all") || (sender instanceof ConsoleCommandSender));
+        commandRoot.requires(sender -> sender.getSender().hasPermission("mmheatmap.root") || (sender instanceof ConsoleCommandSender));
         // Build command
         builtCommand = commandRoot.build();
     }
