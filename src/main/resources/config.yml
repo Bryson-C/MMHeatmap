@@ -32,6 +32,8 @@ colors:
 
 # to disable, enter 0, otherwise, the weight will be added per action
 activityWeights:
+  # The minimum amount of activity for activity to be added to the database
+  minimumActivityForRecording: 5
   playerPlace: 1
   playerBreak: 1
   playerSetSpawn: 1.5

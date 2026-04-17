@@ -92,12 +92,24 @@ public class HeatmapLayer {
         this.bottomRight = new Vector2d(Double.parseDouble(p2[0]), Double.parseDouble(p2[1]));
     }
 
+    /**
+     * Converts a Vector2d into a string with the format: "%.0f,%.0f" (effectively saving it as an integer)
+     * @param pos A point with 2 doubles (Vector2d)
+     * @return returns the vector as a string in the format: "%.0f,%.0f"
+     */
     public static String vec2dToString(Vector2d pos) {
         return String.format("%.0f,%.0f", pos.x, pos.y);
     }
 
-
+    /**
+     * Returns the heatmapLayer's `pollRangeSeconds` field
+     * @return Returns the heatmapLayer's `pollRangeSeconds` field
+     */
     public int getPollRangeSeconds() { return pollRangeSeconds; }
 
-    public String getLabel() {return label; }
+    /**
+     * Returns the heatmapLayer's `label` field
+     * @return Returns the heatmapLayer's `label` field
+     */
+    public String getLabel() { return label; }
 }

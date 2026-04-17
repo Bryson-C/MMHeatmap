@@ -1,5 +1,7 @@
 package org.bc.MMheatmap.poller;
 
+import org.bukkit.configuration.file.FileConfiguration;
+
 /**
  * This class is to be used to store interactions over a specific area. The area that this class covers is not defined within
  * the class itself, only the actions that happen in said area are stored here.
@@ -8,6 +10,12 @@ package org.bc.MMheatmap.poller;
  */
 public class PlayerChunkInteractions {
     double activity;
+    static FileConfiguration config;
+
+
+    PlayerChunkInteractions(FileConfiguration config) {
+        PlayerChunkInteractions.config = config;
+    }
 
     /**
      * @see String#toString()
@@ -46,6 +54,6 @@ public class PlayerChunkInteractions {
      * @return returns an activity score if above a threshold (determined by codebase user), otherwise 0
      */
     public int calculateActivityLevel() {
-        return (int)Math.floor(activity);
+        return (activity >= config.getInt("activityWeights.minimumActivityForRecording")) ? (int)Math.floor(activity) : 0;
     }
 }

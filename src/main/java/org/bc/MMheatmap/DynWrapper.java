@@ -14,7 +14,7 @@ import java.util.*;
 
 
 /**
- * A wrapper object to create dynmap shapes easier
+ * A wrapper object to create dynmap shapes and make functionality easier to work with
  *
  * @author bc/Exo
  */
@@ -205,12 +205,13 @@ public class DynWrapper {
     }
 
     /**
-     * Will get
-     * @param topLeft
-     * @param bottomRight
-     * @param divisionCountSq
-     * @param position
-     * @return
+     * Will get the cell that the coordinates fall in
+     *
+     * @param topLeft The top-left point (x,y)
+     * @param bottomRight The bottom-right point (x,y)
+     * @param divisionCountSq The amount of cells horizontally and vertically to add to the layer (i.e. divisionCountSq * divisionCountSq)
+     * @param position The point to find the cell of
+     * @return The indices [x,y] of the cell
      */
     public static int[] getDividedWorldCellFromPosition(Vector2d topLeft, Vector2d bottomRight, int divisionCountSq, Vector2d position) {
 
@@ -232,12 +233,12 @@ public class DynWrapper {
     }
 
     /**
-     * TODO: Implement Filters So That The Entire Database Is Not Queried At Once
+     * When given a layer, cells will be created and styled based on activity levels in said cell
      *
-     * @param layer
-     * @param set The set to add the markers to, the set will be cleared before usage to avoid errors caused by duplicate ids
-     * @param points
-     * @param flags
+     * @param layer The layer to add the cells to
+     * @param set The set to add the markers to, the set will be cleared before usage to avoid errors caused by duplicate ids, generally will be the same as the layer name in this codebase
+     * @param points The player activity points gotten from the database
+     * @param flags Additional flags to add to the function (currently unused)
      */
     public static void createActiveHeatmapCellsFromCoords(HeatmapLayer layer, MarkerSet set, Map<String, Integer> points, String flags) {
         if (points.isEmpty()) { return; }
@@ -329,6 +330,13 @@ public class DynWrapper {
         }
     }
 
+    /**
+     * Very similar functionality as DynWrapper#createActiveHeatmapCellsFromCoords except its no the whole map being update, only a portion
+     * @param layer The layer to update the cells from
+     * @param set The dynmap set to add the cells to, generally will be the same as the layer name in this codebase
+     * @param points The activity points to be updated, this will also control what cells will be updated since the positions are in the map's key
+     * @param flags Additional flags to add to the function (currently unused)
+     */
     public static void updateHeatmapCellsInRange(HeatmapLayer layer, MarkerSet set, Map<String, Integer> points, String flags) {
         if (points.isEmpty()) { return; }
         // Setting min to the max, and max to the min, will ensure these values will always be set so long as there is more than 1 point

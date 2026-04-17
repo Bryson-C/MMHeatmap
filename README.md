@@ -23,7 +23,7 @@ For example "placeBlock" is worth 1 activity by default.
   - Among others which may potentially indicate player activity!
 
 ## Commands:
-Parent Branch:
+### Parent Branch:
  - /mmheatmap
    - create
    - delete
@@ -33,7 +33,7 @@ Parent Branch:
    - resync
    - benchmark
 
-"create" Branch:
+### "create" Branch:
 - divideWorld -- This tells the plugin to create a layer that's simply divided into multiple segments between 2 (x,y) points
   - example: /mmheatmap create divideWorld "layer_name" -1024 -1024 1024 1024 32 "1w"
   - breakdown:
@@ -58,14 +58,14 @@ Parent Branch:
     - This will be fixed eventually to better support console based usage
     - In the meantime, to create a heatmap layer for a certain world, execute these commands as a player inside the desired worlds
 
-"delete" Branch:
+### "delete" Branch:
  - layer
    - example: /mmheatmap delete layer "layer_name"
    - breakdown: this will simply delete the layer under the name "layer_name" from the database and remove it from the dynmap 
  - playerActivity
-   - Not yet implemented
+    - <p style="color:red">Not yet implemented</p>
 
-"info" Branch:
+### "info" Branch:
  - heatmapLayers
    - example: /mmheatmap info heatmapLayers 
    - ![example of heatmap layers info command](readmeAssets/exampleInfoHeatmapLayers.png)
@@ -77,7 +77,7 @@ Parent Branch:
    - example: /mmheatmap info pollInfo
    - ![example of poll info](readmeAssets/examplePollInfo.png)
 
-"modify" Branch:
+### "modify" Branch:
  - "layer_name" -- you must first pick a layer to modify
    - dateRange -- only works on non-updating layers
      - example: /mmheatmap modify "layer_name" dateRange "2026-01-01 00:00:00" "2026-04-16 00:00:00"
@@ -96,7 +96,7 @@ Parent Branch:
      - example: /mmheatmap modify "layer_name" relativeTimePeriod "2d1h30m"
      - breakdown: changes the layer to have the past 2 days, 1 hour and 30 minutes of data (from time of polling)
 
-"poll" Branch:
+### "poll" Branch:
  - pause: stops polling for all layers (currently only pauses until server reset or resumed)
  - resume: resumes polling for all layers
  - pollLayer:
@@ -108,12 +108,12 @@ Parent Branch:
      - caveat:
        - If you only have 1 heatmap division, this would be the same as polling the entire map
 
-"resync" Branch:
+### "resync" Branch:
  - example: /mmheatmap resync
  - breakdown: if the plugin and the database become unsynced (for whatever reason), this will resynchronize them. This is also done on startup of the plugin
 
-"benchmark" Branch:
- - TODO: Implement
+### "benchmark" Branch:
+- <p style="color:red">TODO: Implement</p>
 
 ## Permissions
 - /mmheatmap info
@@ -151,6 +151,6 @@ Parent Branch:
 - /mmheatmap resync
   - mmheatmap.resync
 - /mmheatmap benchmark
-  - TODO: Implement
+    - <p style="color:red">TODO: Implement</p>
 - /mmheatmap ...
   - mmheatmap.root

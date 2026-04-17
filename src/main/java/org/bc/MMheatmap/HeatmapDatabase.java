@@ -149,11 +149,20 @@ public class HeatmapDatabase {
         cacheHeatmapLayers();
     }
 
-
+    /**
+     * An interface used to run custom sql commands in a lambda
+     * @param <T> The return type of the lambda
+     */
     interface HeatmapSqlFunction<T> {
         T run(Connection connection);
     }
 
+    /**
+     * Used to run a custom sql command as a lambda
+     * @param function The lambda to be executed, its given a connection as its only parameter
+     * @return Returns the value of the lambda after being ran
+     * @param <T> The type of the return
+     */
     public <T> T executeSql(HeatmapSqlFunction<T> function) {
         try (Connection connection = dataSource.getConnection()) {
             return function.run(connection);
@@ -297,12 +306,16 @@ public class HeatmapDatabase {
 
 
     /**
+     * Gets all player activity within the heatmap layer's parameters:
+     * - within the surface area of the top-left and bottom-right points
+     * - within the poll range
+     * - and within the world
      *
      * NOTE: Since maps do not support duplicate keys, more processing is required to make sure all data is included, not a big deal, nor is it really worth bringing up,
      *       but I figured I'd mention it
      *
-     * @param layer
-     * @return
+     * @param layer The layer to get the activity from (using the parameters from the layer)
+     * @return Returns the activity as a map with a key: "{xpos},{ypos}" and a value of the activity level the polling area
      */
     public Map<String, Integer> getPlayerActivityEntriesForLayer(HeatmapLayer layer) {
         Map<String, Integer> activity = new HashMap<>();
@@ -341,6 +354,10 @@ public class HeatmapDatabase {
         return activity;
     }
 
+    /**
+     * Functionality roughly the same as found in the "see more" function, but between 2 given points
+     * @see HeatmapDatabase#getPlayerActivityEntriesForLayer(HeatmapLayer)
+     */
     public Map<String, Integer> getPlayerActivityEntriesForLayerInArea(HeatmapLayer layer, Vector2d xy1, Vector2d xy2) {
         Map<String, Integer> activity = new HashMap<>();
 
@@ -378,6 +395,11 @@ public class HeatmapDatabase {
         return activity;
     }
 
+    /**
+     * Functionality roughly the same as found in the "see more" function, but between 2 dates (fromDate and toDate).
+     * Dates must be in the format: "yyyy-mm-dd hh:mm:ss"
+     * @see HeatmapDatabase#getPlayerActivityEntriesForLayer(HeatmapLayer)
+     */
     public Map<String, Integer> getPlayerActivityEntriesForLayerBetweenDates(HeatmapLayer layer, String fromDate, String toDate) {
         Map<String, Integer> activity = new HashMap<>();
 

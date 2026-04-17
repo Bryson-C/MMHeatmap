@@ -27,12 +27,6 @@ import java.util.regex.Pattern;
 /**
  * A class containing all the commands used to control the heatmap
  *
- * NOTE:
- *  The "PluginBootstrap" interface is declared as experimental, however, papermc documentation
- *  uses this inside their documentation under their "Command API" section
- *
- * TODO: Add "pollRegion" subcommand -- polls only a certain portion of the map, not the whole thing
- *
  *  @author BC/Exo
  */
 public class HeatmapCommand {
@@ -44,7 +38,6 @@ public class HeatmapCommand {
      * Builds the full "/mmheatmap" command tree and initializes the Dynmap API and Database for the rest of the class to use.
      *
      * The code is going to be very horizontal as a result of chaining many many features on a command builder, so Im using 1 line per command feature
-     * (i.e.
      */
     public HeatmapCommand(HeatmapDatabase database, FileConfiguration config) {
         // Sets a database object to be used within some commands
@@ -63,7 +56,7 @@ public class HeatmapCommand {
             .executes(context -> {
                 CommandSender sender = context.getSource().getSender();
 
-                sender.sendRichMessage("<b>Command: /mmheatmap <reset><yellow>(to be added later)");
+                sender.sendRichMessage("<green>Full MMHeatmap Documentation Found: <white><b><click:open_url:'https://github.com/Bryson-C/MMHeatmap'>here");
 
                 return Command.SINGLE_SUCCESS;
             })
@@ -140,19 +133,23 @@ public class HeatmapCommand {
                         // Default time period branch
                         .executes(context -> {
                             // Get Command Parameters
-                            CommandSender sender = context.getSource().getSender();
-                            String layername = StringArgumentType.getString(context, "name");
-                            divideWorldCommandFunction(
-                                    layername,
-                                    sender,
-                                    new Vector2d(IntegerArgumentType.getInteger(context, "x1"), IntegerArgumentType.getInteger(context, "y1")),
-                                    new Vector2d(IntegerArgumentType.getInteger(context, "x2"), IntegerArgumentType.getInteger(context, "y2")),
-                                    IntegerArgumentType.getInteger(context, "divisioncountsq"),
-                                    config.getInt("defaults.pollRangeSeconds"),
-                                    "", ""
-                            );
+                            Runnable r = () -> {
+                                CommandSender sender = context.getSource().getSender();
+                                String layername = StringArgumentType.getString(context, "name");
+                                // both following functions should be threaded
+                                divideWorldCommandFunction(
+                                        layername,
+                                        sender,
+                                        new Vector2d(IntegerArgumentType.getInteger(context, "x1"), IntegerArgumentType.getInteger(context, "y1")),
+                                        new Vector2d(IntegerArgumentType.getInteger(context, "x2"), IntegerArgumentType.getInteger(context, "y2")),
+                                        IntegerArgumentType.getInteger(context, "divisioncountsq"),
+                                        config.getInt("defaults.pollRangeSeconds"),
+                                        "", ""
+                                );
 
-                            pollHeatmapCommandFunction(sender, layername, null, null);
+                                pollHeatmapCommandFunction(sender, layername, null, null);
+                            };
+                            new Thread(r).start();
 
                             return Command.SINGLE_SUCCESS;
                         })
@@ -161,31 +158,35 @@ public class HeatmapCommand {
                             .requires(sender -> sender.getSender().hasPermission("mmheatmap.divideWorld"))
                             .executes(context -> {
 
-                                CommandSender sender = context.getSource().getSender();
-                                String timeString = StringArgumentType.getString(context, "relativetimeperiod");
+                                Runnable r = () -> {
+                                    CommandSender sender = context.getSource().getSender();
+                                    String timeString = StringArgumentType.getString(context, "relativetimeperiod");
 
-                                long pollRangeSeconds = parseTimeStringToSeconds(timeString);
-                                if (pollRangeSeconds == 0) {
-                                    sender.sendRichMessage("<red>Failed Parsing Time String; Try Formats:");
-                                    sender.sendRichMessage("\"2w,5d,7h,2m,10s\"");
-                                    sender.sendRichMessage("\"2w5d7h2m10s\"");
-                                    sender.sendRichMessage("\"5d2h\"");
-                                    sender.sendRichMessage("\"2.50h\"");
-                                    return -1;
-                                }
+                                    long pollRangeSeconds = parseTimeStringToSeconds(timeString);
+                                    if (pollRangeSeconds == 0) {
+                                        sender.sendRichMessage("<red>Failed Parsing Time String; Try Formats:");
+                                        sender.sendRichMessage("\"2w,5d,7h,2m,10s\"");
+                                        sender.sendRichMessage("\"2w5d7h2m10s\"");
+                                        sender.sendRichMessage("\"5d2h\"");
+                                        sender.sendRichMessage("\"2.50h\"");
+                                        return;
+                                    }
 
-                                String layername = StringArgumentType.getString(context, "name");
-                                divideWorldCommandFunction(
-                                    layername,
-                                    sender,
-                                    new Vector2d(IntegerArgumentType.getInteger(context,"x1"), IntegerArgumentType.getInteger(context, "y1")),
-                                    new Vector2d(IntegerArgumentType.getInteger(context,"x2"), IntegerArgumentType.getInteger(context, "y2")),
-                                    IntegerArgumentType.getInteger(context, "divisioncountsq"),
-                                    (int)pollRangeSeconds,
-                                    "",
-                                    ""
-                                );
-                                pollHeatmapCommandFunction(sender, layername, null, null);
+                                    String layername = StringArgumentType.getString(context, "name");
+                                    divideWorldCommandFunction(
+                                            layername,
+                                            sender,
+                                            new Vector2d(IntegerArgumentType.getInteger(context, "x1"), IntegerArgumentType.getInteger(context, "y1")),
+                                            new Vector2d(IntegerArgumentType.getInteger(context, "x2"), IntegerArgumentType.getInteger(context, "y2")),
+                                            IntegerArgumentType.getInteger(context, "divisioncountsq"),
+                                            (int) pollRangeSeconds,
+                                            "",
+                                            ""
+                                    );
+                                    pollHeatmapCommandFunction(sender, layername, null, null);
+                                };
+
+                                new Thread(r).start();
 
                                 return Command.SINGLE_SUCCESS;
                             })
@@ -205,25 +206,27 @@ public class HeatmapCommand {
                                 .requires(sender -> sender.getSender().hasPermission("mmheatmap.divideWorld"))
                                 .executes(context -> {
 
-                                    CommandSender sender = context.getSource().getSender();
+                                    Runnable r = () -> {
+                                        CommandSender sender = context.getSource().getSender();
 
-                                    String startdate = StringArgumentType.getString(context, "startdate");
-                                    String enddate = StringArgumentType.getString(context, "enddate");
-                                    String layername = StringArgumentType.getString(context, "name");
+                                        String startdate = StringArgumentType.getString(context, "startdate");
+                                        String enddate = StringArgumentType.getString(context, "enddate");
+                                        String layername = StringArgumentType.getString(context, "name");
 
-                                    divideWorldCommandFunction(
-                                            layername,
-                                            sender,
-                                            new Vector2d(IntegerArgumentType.getInteger(context,"x1"), IntegerArgumentType.getInteger(context, "y1")),
-                                            new Vector2d(IntegerArgumentType.getInteger(context,"x2"), IntegerArgumentType.getInteger(context, "y2")),
-                                            IntegerArgumentType.getInteger(context, "divisioncountsq"),
-                                            false,
-                                            startdate,
-                                            enddate
-                                    );
+                                        divideWorldCommandFunction(
+                                                layername,
+                                                sender,
+                                                new Vector2d(IntegerArgumentType.getInteger(context, "x1"), IntegerArgumentType.getInteger(context, "y1")),
+                                                new Vector2d(IntegerArgumentType.getInteger(context, "x2"), IntegerArgumentType.getInteger(context, "y2")),
+                                                IntegerArgumentType.getInteger(context, "divisioncountsq"),
+                                                false,
+                                                startdate,
+                                                enddate
+                                        );
 
-                                    pollHeatmapCommandFunction(sender, layername, startdate, enddate);
-
+                                        pollHeatmapCommandFunction(sender, layername, startdate, enddate);
+                                    };
+                                    new Thread(r).start();
                                     return Command.SINGLE_SUCCESS;
                                 })
                             )
@@ -241,25 +244,28 @@ public class HeatmapCommand {
                         .requires(sender -> sender.getSender().hasPermission("mmheatmap.delete.layer"))
                         .executes(context -> {
 
-                            CommandSender sender = context.getSource().getSender();
-                            sender.sendRichMessage("<blue> Deleting Heatmap Overlay");
+                            Runnable r = () -> {
+                                CommandSender sender = context.getSource().getSender();
+                                sender.sendRichMessage("<blue> Deleting Heatmap Overlay");
 
-                            long startTime = System.nanoTime();
+                                long startTime = System.nanoTime();
 
-                            String layerName = StringArgumentType.getString(context, "name");
+                                String layerName = StringArgumentType.getString(context, "name");
 
-                            // delete here
-                            DynWrapper.deleteAreaSet(layerName);
-                            try {
-                                database.deleteHeatmapLayer(layerName);
-                                sender.sendRichMessage("<color:#30f000> Done! (" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-startTime) + "ms)");
-                            } catch (HeatmapDatabase.NoSuchLayerException e) {
-                                sender.sendRichMessage("<red>Layer \"" +layerName+ "\" Does Not Exist");
-                                // Success since command functioned as intended
-                                return Command.SINGLE_SUCCESS;
-                            } catch (Exception e) {
-                                sender.sendRichMessage("<red>Unknown Error Occurred Trying To Delete Layer \"" +layerName+ "\"");
-                            }
+                                // delete here
+                                DynWrapper.deleteAreaSet(layerName);
+                                try {
+                                    database.deleteHeatmapLayer(layerName);
+                                    sender.sendRichMessage("<color:#30f000> Done! (" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime) + "ms)");
+                                } catch (HeatmapDatabase.NoSuchLayerException e) {
+                                    sender.sendRichMessage("<red>Layer \"" + layerName + "\" Does Not Exist");
+                                    // Success since command functioned as intended
+                                    return;
+                                } catch (Exception e) {
+                                    sender.sendRichMessage("<red>Unknown Error Occurred Trying To Delete Layer \"" + layerName + "\"");
+                                }
+                            };
+                            new Thread(r).start();
 
                             return Command.SINGLE_SUCCESS;
                         })
@@ -283,8 +289,12 @@ public class HeatmapCommand {
                         .requires(sender -> sender.getSender().hasPermission("mmheatmap.poll.pollLayer"))
                         // this branch is for when no arguments are provided
                         .executes(context -> {
-                            String layerName = StringArgumentType.getString(context, "name");
-                            return pollHeatmapCommandFunction(context.getSource().getSender(), layerName, null, null);
+                            Runnable r = () -> {
+                                String layerName = StringArgumentType.getString(context, "name");
+                                pollHeatmapCommandFunction(context.getSource().getSender(), layerName, null, null);
+                            };
+                            new Thread(r).start();
+                            return Command.SINGLE_SUCCESS;
                         })
                 )
             )
@@ -295,50 +305,54 @@ public class HeatmapCommand {
                         .requires(sender -> sender.getSender().hasPermission("mmheatmap.poll.pollArea"))
                         .executes(context -> {
 
-                            String layername = StringArgumentType.getString(context, "name");
-                            HeatmapLayer layer = database.getHeatmapLayers().get(layername);
-                            CommandSender sender = context.getSource().getSender();
+                            Runnable r = () -> {
+                                String layername = StringArgumentType.getString(context, "name");
+                                HeatmapLayer layer = database.getHeatmapLayers().get(layername);
+                                CommandSender sender = context.getSource().getSender();
 
-                            // get the cells which the area lies over
-                            int[] indices1 = DynWrapper.getDividedWorldCellFromPosition(
-                                layer.topLeft, layer.bottomRight,  layer.divisions,
-                                new Vector2d(IntegerArgumentType.getInteger(context,"x1"), IntegerArgumentType.getInteger(context, "y1"))
-                            );
-                            int[] indices2 = DynWrapper.getDividedWorldCellFromPosition(
-                                layer.topLeft, layer.bottomRight,  layer.divisions,
-                                new Vector2d(IntegerArgumentType.getInteger(context,"x2"), IntegerArgumentType.getInteger(context, "y2"))
-                            );
+                                // get the cells which the area lies over
+                                int[] indices1 = DynWrapper.getDividedWorldCellFromPosition(
+                                        layer.topLeft, layer.bottomRight, layer.divisions,
+                                        new Vector2d(IntegerArgumentType.getInteger(context, "x1"), IntegerArgumentType.getInteger(context, "y1"))
+                                );
+                                int[] indices2 = DynWrapper.getDividedWorldCellFromPosition(
+                                        layer.topLeft, layer.bottomRight, layer.divisions,
+                                        new Vector2d(IntegerArgumentType.getInteger(context, "x2"), IntegerArgumentType.getInteger(context, "y2"))
+                                );
 
-                            // then get the top left of the cell furthest to the left
-                            int minCellIndexX = Math.min(indices1[0], indices2[0]);
-                            int maxCellIndexX = Math.max(indices1[0], indices2[0]);
-                            // and the bottom right of the cell furthest to the right
-                            int minCellIndexY = Math.min(indices1[1], indices2[1]);
-                            int maxCellIndexY = Math.max(indices1[1], indices2[1]);
+                                // then get the top left of the cell furthest to the left
+                                int minCellIndexX = Math.min(indices1[0], indices2[0]);
+                                int maxCellIndexX = Math.max(indices1[0], indices2[0]);
+                                // and the bottom right of the cell furthest to the right
+                                int minCellIndexY = Math.min(indices1[1], indices2[1]);
+                                int maxCellIndexY = Math.max(indices1[1], indices2[1]);
 
-                            // get coords in an easier format
-                            double x1 = layer.topLeft.x(), z1 = layer.topLeft.y();
-                            double x2 = layer.bottomRight.x(), z2 = layer.bottomRight.y();
+                                // get coords in an easier format
+                                double x1 = layer.topLeft.x(), z1 = layer.topLeft.y();
+                                double x2 = layer.bottomRight.x(), z2 = layer.bottomRight.y();
 
-                            // use math to get total size of area
-                            double width = Math.abs(x1-x2);
-                            double height = Math.abs(z1-z2);
+                                // use math to get total size of area
+                                double width = Math.abs(x1 - x2);
+                                double height = Math.abs(z1 - z2);
 
-                            // get the amount of space each tile should take in the full area
-                            double cellSizeWidth = (width/layer.divisions);
-                            double cellSizeHeight = (height/layer.divisions);
+                                // get the amount of space each tile should take in the full area
+                                double cellSizeWidth = (width / layer.divisions);
+                                double cellSizeHeight = (height / layer.divisions);
 
-                            double[] xy1 = new double[]{(minCellIndexX*cellSizeWidth)-(width/2), ((minCellIndexY*cellSizeWidth) + cellSizeWidth)-(width/2)};
-                            double[] xy2 = new double[]{((maxCellIndexX*cellSizeHeight)-(height/2)), (((maxCellIndexY*cellSizeHeight) + cellSizeHeight))-(height/2)};
+                                double[] xy1 = new double[]{(minCellIndexX * cellSizeWidth) - (width / 2), ((minCellIndexY * cellSizeWidth) + cellSizeWidth) - (width / 2)};
+                                double[] xy2 = new double[]{((maxCellIndexX * cellSizeHeight) - (height / 2)), (((maxCellIndexY * cellSizeHeight) + cellSizeHeight)) - (height / 2)};
 
-                            System.out.printf("Cell Range: [%d, %d] -> [%d, %d]\n", indices1[0], indices1[1], indices2[0], indices2[1]);
-                            System.out.printf("Cell Range Blocks: [%.0f, %.0f] -> [%.0f, %.0f]\n", xy1[0], xy2[0], xy1[1], xy2[1]);
-                            pollHeatmapArea(
-                                sender,
-                                layername,
-                                new Vector2d(xy1[0], xy1[1]),
-                                new Vector2d(xy2[0], xy2[1])
-                            );
+                                System.out.printf("Cell Range: [%d, %d] -> [%d, %d]\n", indices1[0], indices1[1], indices2[0], indices2[1]);
+                                System.out.printf("Cell Range Blocks: [%.0f, %.0f] -> [%.0f, %.0f]\n", xy1[0], xy2[0], xy1[1], xy2[1]);
+                                pollHeatmapArea(
+                                        sender,
+                                        layername,
+                                        new Vector2d(xy1[0], xy1[1]),
+                                        new Vector2d(xy2[0], xy2[1])
+                                );
+                            };
+
+                            new Thread(r).start();
 
                             return Command.SINGLE_SUCCESS;
                         })
@@ -434,46 +448,48 @@ public class HeatmapCommand {
                         .then(Commands.argument("enddate", StringArgumentType.string())
                             .requires(sender -> sender.getSender().hasPermission("mmheatmap.modify.dateRange"))
                             .executes(context -> {
+                                Runnable r = () -> {
+                                    String layerName = StringArgumentType.getString(context, "name");
+                                    CommandSender sender = context.getSource().getSender();
 
-                                String layerName = StringArgumentType.getString(context, "name");
-                                CommandSender sender = context.getSource().getSender();
+                                    String startdate = StringArgumentType.getString(context, "startdate");
+                                    String enddate = StringArgumentType.getString(context, "enddate");
 
-                                String startdate = StringArgumentType.getString(context, "startdate");
-                                String enddate = StringArgumentType.getString(context, "enddate");
-
-                                if (!isValidDateString(startdate)) {
-                                    sender.sendRichMessage("<red>Argument \"startdate\" Has Invalid Date Format, Format As Follows: \"yyyy-mm-dd hh:mm:ss\"");
-                                    return Command.SINGLE_SUCCESS;
-                                }
-                                if (!isValidDateString(enddate)) {
-                                    sender.sendRichMessage("<red>Argument \"enddate\" Has Invalid Date Format, Format As Follows: \"yyyy-mm-dd hh:mm:ss\"");
-                                    return Command.SINGLE_SUCCESS;
-                                }
-
-                                HeatmapLayer layer = database.getHeatmapLayers().get(layerName);
-
-                                if (layer.pollRangeSeconds != config.getInt("defaults.noUpdatePollRangeSeconds")) {
-                                    sender.sendRichMessage("<red>dateRange modification setting is only to be used for non-updating maps, try \"/... modify relativetimeperiod\"");
-                                    return Command.SINGLE_SUCCESS;
-                                }
-
-                                database.executeSql((connection)->{
-                                    try {
-                                        PreparedStatement statement = connection.prepareStatement("UPDATE `heatmap_layers`SET `fromToDate`= ? WHERE `dyn_id` = ? AND `dyn_label` = ?;");
-                                        statement.setString(1, String.format("%s,%s", startdate, enddate));
-                                        statement.setString(2, layer.id);
-                                        statement.setString(3, layer.label);
-
-                                        statement.execute();
-                                    } catch (Exception e) {
-                                        sender.sendRichMessage("<red>Failed To Update Heatmap Layer In The Database");
-                                        sender.sendRichMessage(e.getMessage());
+                                    if (!isValidDateString(startdate)) {
+                                        sender.sendRichMessage("<red>Argument \"startdate\" Has Invalid Date Format, Format As Follows: \"yyyy-mm-dd hh:mm:ss\"");
+                                        return;
                                     }
-                                    // return type does not matter here
-                                    return null;
-                                });
+                                    if (!isValidDateString(enddate)) {
+                                        sender.sendRichMessage("<red>Argument \"enddate\" Has Invalid Date Format, Format As Follows: \"yyyy-mm-dd hh:mm:ss\"");
+                                        return;
+                                    }
 
-                                pollHeatmapCommandFunction(sender, layerName, startdate, enddate);
+                                    HeatmapLayer layer = database.getHeatmapLayers().get(layerName);
+
+                                    if (layer.pollRangeSeconds != config.getInt("defaults.noUpdatePollRangeSeconds")) {
+                                        sender.sendRichMessage("<red>dateRange modification setting is only to be used for non-updating maps, try \"/... modify relativetimeperiod\"");
+                                        return;
+                                    }
+
+                                    database.executeSql((connection) -> {
+                                        try {
+                                            PreparedStatement statement = connection.prepareStatement("UPDATE `heatmap_layers`SET `fromToDate`= ? WHERE `dyn_id` = ? AND `dyn_label` = ?;");
+                                            statement.setString(1, String.format("%s,%s", startdate, enddate));
+                                            statement.setString(2, layer.id);
+                                            statement.setString(3, layer.label);
+
+                                            statement.execute();
+                                        } catch (Exception e) {
+                                            sender.sendRichMessage("<red>Failed To Update Heatmap Layer In The Database");
+                                            sender.sendRichMessage(e.getMessage());
+                                        }
+                                        // return type does not matter here
+                                        return null;
+                                    });
+
+                                    pollHeatmapCommandFunction(sender, layerName, startdate, enddate);
+                                };
+                                new Thread(r).start();
 
                                 return Command.SINGLE_SUCCESS;
                             })
@@ -571,6 +587,7 @@ public class HeatmapCommand {
             .requires(sender -> sender.getSender().hasPermission("mmheatmap.info.heatmapLayers"))
             .executes(context -> {
 
+                // not threaded because all calls get data from memory, so every operation should be fast
                 CommandSender sender = context.getSource().getSender();
 
                 long startTime = System.nanoTime();
@@ -604,12 +621,15 @@ public class HeatmapCommand {
         LiteralArgumentBuilder<CommandSourceStack> resyncCommand = Commands.literal("resync")
             .requires(sender -> sender.getSender().hasPermission("mmheatmap.resync"))
             .executes(context -> {
-                CommandSender sender = context.getSource().getSender();
+                Runnable r = () -> {
+                    CommandSender sender = context.getSource().getSender();
 
-                sender.sendRichMessage("<blue>Resyncing heatmap layers with database");
-                long startTime = System.nanoTime();
-                database.resyncHeatmapDatabase();
-                sender.sendRichMessage("<color:#30f000> Done! (" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-startTime) + "ms)");
+                    sender.sendRichMessage("<blue>Resyncing heatmap layers with database");
+                    long startTime = System.nanoTime();
+                    database.resyncHeatmapDatabase();
+                    sender.sendRichMessage("<color:#30f000> Done! (" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime) + "ms)");
+                };
+                new Thread(r).start();
 
                 return Command.SINGLE_SUCCESS;
             });
@@ -620,7 +640,10 @@ public class HeatmapCommand {
             .requires(sender -> sender.getSender().hasPermission("mmheatmap.benchmark"))
             .executes(context -> {
 
+
                     CommandSender sender = context.getSource().getSender();
+
+                    sender.sendRichMessage("<yellow> Not implemented yet");
 
                     long startTime = System.nanoTime();
                     sender.sendRichMessage("Query Took <reset>(<color:#30f000>" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-startTime) + "ms<reset>)");
@@ -661,16 +684,20 @@ public class HeatmapCommand {
     }
 
     /**
+     * Contains the functionality to divide the world into multiple cells on the dynmap side
      *
-     * @param heatmapName
-     * @param sender
-     * @param xy1
-     * @param xy2
-     * @param divisionCount
-     * @param pollRangeSeconds
-     * @return
+     * NOTE: not threaded by default
+     *
+     * @param heatmapName The layer name
+     * @param sender The command sender
+     * @param xy1 The top-left point (x1,y1)
+     * @param xy2 The bottom-right point (x2, y2)
+     * @param divisionCount How many cells to make horizontally and vertically
+     * @param pollRangeSeconds How much time worth of data to include in the layer after polling. Time is in the range [Now-(pollRangeSeconds), Now]
+     * @return Returns a success code
      */
     static private int divideWorldCommandFunction(String heatmapName, CommandSender sender, Vector2d xy1, Vector2d xy2, int divisionCount, int pollRangeSeconds, String fromDate, String toDate) {
+
         String world = (sender instanceof Player player) ? player.getWorld().getName() : config.getString("defaults.world_name");
 
         long startTime = System.nanoTime();
@@ -693,28 +720,27 @@ public class HeatmapCommand {
 
 
             } catch (HeatmapDatabase.DuplicateLayerException dupE) {
-                sender.sendRichMessage("<red>Heatmap layer \""+heatmapName+"\" already exists, use new name; or delete, then recreate heatmap layer");
+                sender.sendRichMessage("<red>Heatmap layer \"" + heatmapName + "\" already exists, use new name; or delete, then recreate heatmap layer");
                 // This is a success because it functions as intended
                 return Command.SINGLE_SUCCESS;
-            }
-            catch (Exception e) {
-                sender.sendRichMessage("<red>Unknown Error Occurred Trying To Create Layer \"" +heatmapName+"\"");
+            } catch (Exception e) {
+                sender.sendRichMessage("<red>Unknown Error Occurred Trying To Create Layer \"" + heatmapName + "\"");
             }
 
         } catch (Exception e) {
             System.err.printf("Failed To Create Marker: %s\n", e.getMessage());
             sender.sendRichMessage("<red>Failed Creating Dynmap Marker; See Console");
-            return -1;
+            return Command.SINGLE_SUCCESS;
         }
 
-        sender.sendRichMessage("Created Heatmap <blue><b>"+heatmapName+"<reset>(<color:#30f000>" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-startTime) + "ms<reset>)");
+        sender.sendRichMessage("Created Heatmap <blue><b>" + heatmapName + "<reset>(<color:#30f000>" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime) + "ms<reset>)");
 
         // check to see if the map will update, if so display that time, else display a different message
         if (pollRangeSeconds == config.getInt("defaults.noUpdatePollRangeSeconds")) {
-            sender.sendRichMessage("Heatmap <blue><b>"+heatmapName+"<reset> Is Set To Not Update, To Change This See: <b>/mmheatmap modify...");
+            sender.sendRichMessage("Heatmap <blue><b>" + heatmapName + "<reset> Is Set To Not Update, To Change This See: <b>/mmheatmap modify...");
         } else {
 
-            sender.sendRichMessage("Heatmap <blue><b>"+heatmapName+"<reset> Will Update Every " + config.get("defaults.pollFrequencySeconds") + " Seconds Containing The Past "+pollRangeSeconds+" Seconds Of Activity Data, To Change This See: <b>/mmheatmap modify...");
+            sender.sendRichMessage("Heatmap <blue><b>" + heatmapName + "<reset> Will Update Every " + config.get("defaults.pollFrequencySeconds") + " Seconds Containing The Past " + pollRangeSeconds + " Seconds Of Activity Data, To Change This See: <b>/mmheatmap modify...");
         }
 
         return Command.SINGLE_SUCCESS;
@@ -725,6 +751,8 @@ public class HeatmapCommand {
      * The context comes from the ".execute(...)" part of the command tree. Args must be passed in as they will not
      * be gotten from the inside of this function.
      *
+     * NOTE: Not threaded by default
+     *
      * @param sender The sender of the command
      * @param layerName The name of the layer which needs to be polled
      * @param fromDate must be non-null if `toDate` is also non-null
@@ -732,67 +760,64 @@ public class HeatmapCommand {
      * @return returns the command success code, generally SINGLE_SUCCESS (or 1)
      */
     static public int pollHeatmapCommandFunction(CommandSender sender, String layerName, String fromDate, String toDate) {
-        Runnable run = ()->{
-            long startTime = System.nanoTime();
+        long startTime = System.nanoTime();
 
-            HeatmapLayer layer = database.getHeatmapLayers().get(layerName);
+        HeatmapLayer layer = database.getHeatmapLayers().get(layerName);
 
-            // recreate set
-            MarkerSet set = DynWrapper.getAreaSetOrCreate(layerName);
+        // recreate set
+        MarkerSet set = DynWrapper.getAreaSetOrCreate(layerName);
 
-            // database query
-            long queryStartTime = System.nanoTime();
+        // database query
+        long queryStartTime = System.nanoTime();
 
-            Map<String, Integer> activityEntries;
-            if (fromDate == null && toDate == null) {
-                activityEntries = database.getPlayerActivityEntriesForLayer(layer);
+        Map<String, Integer> activityEntries;
+        if (fromDate == null && toDate == null) {
+            activityEntries = database.getPlayerActivityEntriesForLayer(layer);
+        } else {
+            if (fromDate == null || toDate == null) {
+                sender.sendRichMessage("<red>If \"fromdate\" is valid, \"todate\" must also be valid");
+                return Command.SINGLE_SUCCESS;
             } else {
-                if (fromDate == null || toDate == null) {
-                    sender.sendRichMessage("<red>If \"fromdate\" is valid, \"todate\" must also be valid");
-                    return;
+                if (isValidDateString(fromDate) && isValidDateString(toDate)) {
+                    activityEntries = database.getPlayerActivityEntriesForLayerBetweenDates(layer, fromDate, toDate);
                 } else {
-                    if (isValidDateString(fromDate) && isValidDateString(toDate)) {
-                        activityEntries = database.getPlayerActivityEntriesForLayerBetweenDates(layer, fromDate, toDate);
-                    } else {
-                        sender.sendRichMessage("<red>\"fromDate\" or \"toDate\" Argument Has Invalid Format, Format As Follows: \"yyyy-mm-dd hh:mm:ss\"");
-                        return;
-                    }
+                    sender.sendRichMessage("<red>\"fromDate\" or \"toDate\" Argument Has Invalid Format, Format As Follows: \"yyyy-mm-dd hh:mm:ss\"");
+                    return Command.SINGLE_SUCCESS;
                 }
             }
-            long queryTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-queryStartTime);
+        }
+        long queryTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-queryStartTime);
 
-            // create the heatmap cells
-            long dynStartTime = System.nanoTime();
+        // create the heatmap cells
+        long dynStartTime = System.nanoTime();
 
-            DynWrapper.createActiveHeatmapCellsFromCoords(layer, set, activityEntries, "");
+        DynWrapper.createActiveHeatmapCellsFromCoords(layer, set, activityEntries, "");
 
-            // FIXME: Background Layer Takes Too Long To Generate And Covers Other Cells
-            // add single background layer -- makes the map easier to read
-            /*double[] xy1 = new double[]{layer.topLeft.x, layer.bottomRight.x};
-            double[] xy2 = new double[]{layer.topLeft.y, layer.bottomRight.y};
-            try {
-                AreaMarker backgroundMarker = set.createAreaMarker("layer_background", "", false, layer.world, xy1, xy2, true);
-                backgroundMarker.setFillStyle(
-                        config.getDouble("colors.heatmapBaseLayerOpacity"),
-                        DynWrapper.colorToInteger(DynWrapper.hexToColor((config.getString("colors.heatmapBaseLayerColor"))))
-                );
-                backgroundMarker.setRangeY(0,0);
-            } catch (Exception e) {
-                System.err.println("Error Filling Background: " + e.getMessage());
-            }*/
+        // FIXME: Background Layer Takes Too Long To Generate And Covers Other Cells
+        // add single background layer -- makes the map easier to read
+        /*double[] xy1 = new double[]{layer.topLeft.x, layer.bottomRight.x};
+        double[] xy2 = new double[]{layer.topLeft.y, layer.bottomRight.y};
+        try {
+            AreaMarker backgroundMarker = set.createAreaMarker("layer_background", "", false, layer.world, xy1, xy2, true);
+            backgroundMarker.setFillStyle(
+                    config.getDouble("colors.heatmapBaseLayerOpacity"),
+                    DynWrapper.colorToInteger(DynWrapper.hexToColor((config.getString("colors.heatmapBaseLayerColor"))))
+            );
+            backgroundMarker.setRangeY(0,0);
+        } catch (Exception e) {
+            System.err.println("Error Filling Background: " + e.getMessage());
+        }*/
 
-            long dynTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-dynStartTime);
+        long dynTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-dynStartTime);
 
-            if (config.getBoolean("defaults.logPollTime"))
-                sender.sendRichMessage("<green>"+layerName+" Polling Completed! (Ttl: " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-startTime) + "ms, <blue>Db: "+queryTime+"ms, <red>Dyn: "+dynTime+"ms<green>)");
-        };
+        if (config.getBoolean("defaults.logPollTime"))
+            sender.sendRichMessage("<green>"+layerName+" Polling Completed! (Ttl: " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-startTime) + "ms, <blue>Db: "+queryTime+"ms, <red>Dyn: "+dynTime+"ms<green>)");
+
 
         if (!database.getHeatmapLayers().containsKey(layerName)) {
             sender.sendRichMessage("<red>Cannot Find Layer " + layerName);
             return -1;
         }
-
-        new Thread(run).start();
 
         return Command.SINGLE_SUCCESS;
     }
@@ -809,6 +834,7 @@ public class HeatmapCommand {
 
     /**
      * Polls a small area of a larger map
+     * NOTE: not threaded by default
      *
      * @param sender The sender of the command
      * @param layerName The layer of the area that needs to be polled
@@ -817,53 +843,51 @@ public class HeatmapCommand {
      * @return returns Command Success -- all errors are handled internally
      */
     static private int pollHeatmapArea(CommandSender sender, String layerName, Vector2d xy1, Vector2d xy2) {
-        Runnable run = ()->{
-            long startTime = System.nanoTime();
 
-            HeatmapLayer layer = database.getHeatmapLayers().get(layerName);
+        long startTime = System.nanoTime();
 
-            // recreate set
-            MarkerSet set = DynWrapper.getAreaSetOrCreate(layerName);
+        HeatmapLayer layer = database.getHeatmapLayers().get(layerName);
 
-            // database query
-            long queryStartTime = System.nanoTime();
+        // recreate set
+        MarkerSet set = DynWrapper.getAreaSetOrCreate(layerName);
+
+        // database query
+        long queryStartTime = System.nanoTime();
 
 
-            long queryTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-queryStartTime);
-            Map<String, Integer> activityEntries = database.getPlayerActivityEntriesForLayerInArea(layer, xy1, xy2);
+        long queryTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-queryStartTime);
+        Map<String, Integer> activityEntries = database.getPlayerActivityEntriesForLayerInArea(layer, xy1, xy2);
 
-            // create the heatmap cells
-            long dynStartTime = System.nanoTime();
+        // create the heatmap cells
+        long dynStartTime = System.nanoTime();
 
-            DynWrapper.updateHeatmapCellsInRange(layer, set, activityEntries, "");
+        DynWrapper.updateHeatmapCellsInRange(layer, set, activityEntries, "");
 
-            // FIXME: Background Layer Takes Too Long To Generate And Covers Other Cells
-            // add single background layer -- makes the map easier to read
-            /*double[] xy1 = new double[]{layer.topLeft.x, layer.bottomRight.x};
-            double[] xy2 = new double[]{layer.topLeft.y, layer.bottomRight.y};
-            try {
-                AreaMarker backgroundMarker = set.createAreaMarker("layer_background", "", false, layer.world, xy1, xy2, true);
-                backgroundMarker.setFillStyle(
-                        config.getDouble("colors.heatmapBaseLayerOpacity"),
-                        DynWrapper.colorToInteger(DynWrapper.hexToColor((config.getString("colors.heatmapBaseLayerColor"))))
-                );
-                backgroundMarker.setRangeY(0,0);
-            } catch (Exception e) {
-                System.err.println("Error Filling Background: " + e.getMessage());
-            }*/
+        // FIXME: Background Layer Takes Too Long To Generate And Covers Other Cells
+        // add single background layer -- makes the map easier to read
+        /*double[] xy1 = new double[]{layer.topLeft.x, layer.bottomRight.x};
+        double[] xy2 = new double[]{layer.topLeft.y, layer.bottomRight.y};
+        try {
+            AreaMarker backgroundMarker = set.createAreaMarker("layer_background", "", false, layer.world, xy1, xy2, true);
+            backgroundMarker.setFillStyle(
+                    config.getDouble("colors.heatmapBaseLayerOpacity"),
+                    DynWrapper.colorToInteger(DynWrapper.hexToColor((config.getString("colors.heatmapBaseLayerColor"))))
+            );
+            backgroundMarker.setRangeY(0,0);
+        } catch (Exception e) {
+            System.err.println("Error Filling Background: " + e.getMessage());
+        }*/
 
-            long dynTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-dynStartTime);
+        long dynTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-dynStartTime);
 
-            if (config.getBoolean("defaults.logPollTime"))
-                sender.sendRichMessage("<green>"+layerName+" Polling Completed! (Ttl: " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-startTime) + "ms, <blue>Db: "+queryTime+"ms, <red>Dyn: "+dynTime+"ms<green>)");
-        };
+        if (config.getBoolean("defaults.logPollTime"))
+            sender.sendRichMessage("<green>"+layerName+" Polling Completed! (Ttl: " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-startTime) + "ms, <blue>Db: "+queryTime+"ms, <red>Dyn: "+dynTime+"ms<green>)");
+
 
         if (!database.getHeatmapLayers().containsKey(layerName)) {
             sender.sendRichMessage("<red>Cannot Find Layer " + layerName);
             return -1;
         }
-
-        new Thread(run).start();
 
         return Command.SINGLE_SUCCESS;
     }
@@ -910,6 +934,7 @@ public class HeatmapCommand {
 
     /**
      * This ensures a date format is as follows: "yyyy-mm-dd hh:mm:ss"
+     *
      * @param date The string which represents a date
      * @return Returns true if the date format is valid
      */

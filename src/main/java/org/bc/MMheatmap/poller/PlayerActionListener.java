@@ -55,6 +55,10 @@ public class PlayerActionListener implements Listener {
     static public double playerShearEntityEventWeight;
     static public double playerTakeLecternBookEventWeight;
 
+    /**
+     * Reads the config file for action weights and saves them in variables so that the file is not reading from disk frequently
+     * @param config The config file with the action weights inside
+     */
     PlayerActionListener(FileConfiguration config) {
         PlayerActionListener.chunksSq = config.getInt("defaults.pollAreaChunkSize");
         PlayerActionListener.playerPlaceWeight = config.getDouble("activityWeights.playerPlace");
@@ -83,8 +87,9 @@ public class PlayerActionListener implements Listener {
 
 
     /**
-     * NOTE: Not To Be Used In Production, Testing Code Only
+     * TODO: add more flexible options to allow this to be used in the future "benchmark" command branch
      *
+     * Generates fake player activity for testing the heatmap
      */
     public static void generateFakePlayerData(int count, int minActivity, int maxActivity) {
         Random r = new Random();
@@ -105,7 +110,12 @@ public class PlayerActionListener implements Listener {
         }
     }
 
-
+    /**
+     * Gets the chunk of an interaction from the `playerActions` field
+     * @param chunk The chunk of the action
+     * @param player The player who's doing said action
+     * @return Returns a `PlayerChunkInteractions` object
+     */
     private static PlayerChunkInteractions getPlayerChunkInteractions(Chunk chunk, Player player) {
         // Im using x,y instead of x,z because the heatmap is 2d, so y is the vertical axis
         String key = String.format("%s;%d,%d", chunk.getWorld().getName(), chunk.getX(), chunk.getZ());
@@ -121,6 +131,8 @@ public class PlayerActionListener implements Listener {
         PlayerChunkInteractions actions = map.get(player.getName());
         return actions;
     }
+
+    // The following are all event listeners with weights: I will not be documenting them all
 
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerPlace(BlockPlaceEvent event) {
@@ -227,11 +239,18 @@ public class PlayerActionListener implements Listener {
         event.getPlayer().sendRichMessage("<b>chunk interactions: <reset>" + actions.toRichMessage());
     }
 
-
+    /**
+     * Returns the `playerActions` map
+     * @return Returns the `playerActions` map
+     */
     public static Map<String, Map<String, PlayerChunkInteractions>> getPlayerActions() {
         return playerActions;
     }
 
+    /**
+     * Clears the `playerActions` map.
+     * When inserting player activity into the database from the here. Make sure to clear out the `playerActions` map to not have duplicate data
+     */
     public static void clearPlayerActions() {
         playerActions.clear();
     }
