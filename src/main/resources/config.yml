@@ -1,7 +1,7 @@
 database:
-  address: 'jdbc:mysql://localhost:3306/mmheatmap'
-  username: 'root'
-  password: '1550'
+  address: 'jdbc:mysql://address:port/database'
+  username: 'username'
+  password: 'password'
 
 defaults:
   world_name: 'world'
