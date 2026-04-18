@@ -8,7 +8,9 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import org.bc.MMheatmap.poller.PlayerActivityPoller;
+import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -48,7 +50,6 @@ public class HeatmapCommand {
         // Command root
         LiteralArgumentBuilder<CommandSourceStack> commandRoot = Commands.literal("mmheatmap");
 
-        // Larger Commands
 
         // Info/Help Command
         LiteralArgumentBuilder<CommandSourceStack> infoCommand = Commands.literal("info")
@@ -129,67 +130,76 @@ public class HeatmapCommand {
             .then(Commands.argument("name", StringArgumentType.string())
                 .then(Commands.argument("x1", IntegerArgumentType.integer()).then(Commands.argument("y1", IntegerArgumentType.integer()).then(Commands.argument("x2", IntegerArgumentType.integer()).then(Commands.argument("y2", IntegerArgumentType.integer())
                     .then(Commands.argument("divisioncountsq", IntegerArgumentType.integer(1))
-                        .requires(sender -> sender.getSender().hasPermission("mmheatmap.divideWorld"))
-                        // Default time period branch
-                        .executes(context -> {
-                            // Get Command Parameters
-                            Runnable r = () -> {
-                                CommandSender sender = context.getSource().getSender();
-                                String layername = StringArgumentType.getString(context, "name");
-                                // both following functions should be threaded
-                                divideWorldCommandFunction(
-                                        layername,
-                                        sender,
-                                        new Vector2d(IntegerArgumentType.getInteger(context, "x1"), IntegerArgumentType.getInteger(context, "y1")),
-                                        new Vector2d(IntegerArgumentType.getInteger(context, "x2"), IntegerArgumentType.getInteger(context, "y2")),
-                                        IntegerArgumentType.getInteger(context, "divisioncountsq"),
-                                        config.getInt("defaults.pollRangeSeconds"),
-                                        "", ""
-                                );
-
-                                pollHeatmapCommandFunction(sender, layername, null, null);
-                            };
-                            new Thread(r).start();
-
-                            return Command.SINGLE_SUCCESS;
-                        })
-                        // custom time period branch
-                        .then(Commands.argument("relativetimeperiod", StringArgumentType.string())
+                        .then(Commands.argument("world", ArgumentTypes.world())
                             .requires(sender -> sender.getSender().hasPermission("mmheatmap.divideWorld"))
+                            // Default time period branch
                             .executes(context -> {
-
+                                // Get Command Parameters
                                 Runnable r = () -> {
                                     CommandSender sender = context.getSource().getSender();
-                                    String timeString = StringArgumentType.getString(context, "relativetimeperiod");
-
-                                    long pollRangeSeconds = parseTimeStringToSeconds(timeString);
-                                    if (pollRangeSeconds == 0) {
-                                        sender.sendRichMessage("<red>Failed Parsing Time String; Try Formats:");
-                                        sender.sendRichMessage("\"2w,5d,7h,2m,10s\"");
-                                        sender.sendRichMessage("\"2w5d7h2m10s\"");
-                                        sender.sendRichMessage("\"5d2h\"");
-                                        sender.sendRichMessage("\"2.50h\"");
-                                        return;
-                                    }
-
                                     String layername = StringArgumentType.getString(context, "name");
+                                    World world = context.getArgument("world", World.class);
+                                    // both following functions should be threaded
                                     divideWorldCommandFunction(
                                             layername,
                                             sender,
                                             new Vector2d(IntegerArgumentType.getInteger(context, "x1"), IntegerArgumentType.getInteger(context, "y1")),
                                             new Vector2d(IntegerArgumentType.getInteger(context, "x2"), IntegerArgumentType.getInteger(context, "y2")),
                                             IntegerArgumentType.getInteger(context, "divisioncountsq"),
-                                            (int) pollRangeSeconds,
-                                            "",
-                                            ""
+                                            config.getInt("defaults.pollRangeSeconds"),
+                                            world.getName(),
+                                            "", ""
                                     );
+
                                     pollHeatmapCommandFunction(sender, layername, null, null);
                                 };
-
                                 new Thread(r).start();
 
                                 return Command.SINGLE_SUCCESS;
                             })
+                        )
+                        // custom time period branch
+                        .then(Commands.argument("relativetimeperiod", StringArgumentType.string())
+                            .then(Commands.argument("world", ArgumentTypes.world())
+                                .requires(sender -> sender.getSender().hasPermission("mmheatmap.divideWorld"))
+                                .executes(context -> {
+
+                                    Runnable r = () -> {
+
+                                        CommandSender sender = context.getSource().getSender();
+                                        String timeString = StringArgumentType.getString(context, "relativetimeperiod");
+                                        World world = context.getArgument("world", World.class);
+
+                                        long pollRangeSeconds = parseTimeStringToSeconds(timeString);
+                                        if (pollRangeSeconds == 0) {
+                                            sender.sendRichMessage("<red>Failed Parsing Time String; Try Formats:");
+                                            sender.sendRichMessage("\"2w,5d,7h,2m,10s\"");
+                                            sender.sendRichMessage("\"2w5d7h2m10s\"");
+                                            sender.sendRichMessage("\"5d2h\"");
+                                            sender.sendRichMessage("\"2.50h\"");
+                                            return;
+                                        }
+
+                                        String layername = StringArgumentType.getString(context, "name");
+                                        divideWorldCommandFunction(
+                                                layername,
+                                                sender,
+                                                new Vector2d(IntegerArgumentType.getInteger(context, "x1"), IntegerArgumentType.getInteger(context, "y1")),
+                                                new Vector2d(IntegerArgumentType.getInteger(context, "x2"), IntegerArgumentType.getInteger(context, "y2")),
+                                                IntegerArgumentType.getInteger(context, "divisioncountsq"),
+                                                (int) pollRangeSeconds,
+                                                world.getName(),
+                                                "",
+                                                ""
+                                        );
+                                        pollHeatmapCommandFunction(sender, layername, null, null);
+                                    };
+
+                                    new Thread(r).start();
+
+                                    return Command.SINGLE_SUCCESS;
+                                })
+                            )
                         )
                     )
                 )))
@@ -203,32 +213,35 @@ public class HeatmapCommand {
                     .then(Commands.argument("divisioncountsq", IntegerArgumentType.integer(1))
                         .then(Commands.argument("startdate", StringArgumentType.string())
                             .then(Commands.argument("enddate", StringArgumentType.string())
-                                .requires(sender -> sender.getSender().hasPermission("mmheatmap.divideWorld"))
-                                .executes(context -> {
+                                .then(Commands.argument("world", ArgumentTypes.world())
+                                    .requires(sender -> sender.getSender().hasPermission("mmheatmap.divideWorld"))
+                                    .executes(context -> {
+                                        Runnable r = () -> {
+                                            CommandSender sender = context.getSource().getSender();
 
-                                    Runnable r = () -> {
-                                        CommandSender sender = context.getSource().getSender();
+                                            World world = context.getArgument("world", World.class);
+                                            String startdate = StringArgumentType.getString(context, "startdate");
+                                            String enddate = StringArgumentType.getString(context, "enddate");
+                                            String layername = StringArgumentType.getString(context, "name");
 
-                                        String startdate = StringArgumentType.getString(context, "startdate");
-                                        String enddate = StringArgumentType.getString(context, "enddate");
-                                        String layername = StringArgumentType.getString(context, "name");
+                                            divideWorldCommandFunction(
+                                                    layername,
+                                                    sender,
+                                                    new Vector2d(IntegerArgumentType.getInteger(context, "x1"), IntegerArgumentType.getInteger(context, "y1")),
+                                                    new Vector2d(IntegerArgumentType.getInteger(context, "x2"), IntegerArgumentType.getInteger(context, "y2")),
+                                                    IntegerArgumentType.getInteger(context, "divisioncountsq"),
+                                                    false,
+                                                    world.getName(),
+                                                    startdate,
+                                                    enddate
+                                            );
 
-                                        divideWorldCommandFunction(
-                                                layername,
-                                                sender,
-                                                new Vector2d(IntegerArgumentType.getInteger(context, "x1"), IntegerArgumentType.getInteger(context, "y1")),
-                                                new Vector2d(IntegerArgumentType.getInteger(context, "x2"), IntegerArgumentType.getInteger(context, "y2")),
-                                                IntegerArgumentType.getInteger(context, "divisioncountsq"),
-                                                false,
-                                                startdate,
-                                                enddate
-                                        );
-
-                                        pollHeatmapCommandFunction(sender, layername, startdate, enddate);
-                                    };
-                                    new Thread(r).start();
-                                    return Command.SINGLE_SUCCESS;
-                                })
+                                            pollHeatmapCommandFunction(sender, layername, startdate, enddate);
+                                        };
+                                        new Thread(r).start();
+                                        return Command.SINGLE_SUCCESS;
+                                    })
+                                )
                             )
                         )
                     )
@@ -376,8 +389,6 @@ public class HeatmapCommand {
             })
             );
 
-        // FIXME: Create warning message about layers being too dense for small areas (thereby creating points, rather than cells)
-        //        I simply dont know the math behind this yet, so its not implemented
         // Modify Command
         LiteralArgumentBuilder<CommandSourceStack> modifyCommand = Commands.literal("modify")
             .then(Commands.argument("name", StringArgumentType.string())
@@ -696,9 +707,10 @@ public class HeatmapCommand {
      * @param pollRangeSeconds How much time worth of data to include in the layer after polling. Time is in the range [Now-(pollRangeSeconds), Now]
      * @return Returns a success code
      */
-    static private int divideWorldCommandFunction(String heatmapName, CommandSender sender, Vector2d xy1, Vector2d xy2, int divisionCount, int pollRangeSeconds, String fromDate, String toDate) {
+    static private int divideWorldCommandFunction(String heatmapName, CommandSender sender, Vector2d xy1, Vector2d xy2, int divisionCount, int pollRangeSeconds, String world, String fromDate, String toDate) {
 
-        String world = (sender instanceof Player player) ? player.getWorld().getName() : config.getString("defaults.world_name");
+        if (world.isEmpty())
+            world =  config.getString("defaults.world_name");
 
         long startTime = System.nanoTime();
 
@@ -825,11 +837,11 @@ public class HeatmapCommand {
     /**
      * Same functionality as found in `see more` section
      *
-     * @see HeatmapCommand#divideWorldCommandFunction(String, CommandSender, Vector2d, Vector2d, int, int, String, String)
+     * @see HeatmapCommand#divideWorldCommandFunction(String, CommandSender, Vector2d, Vector2d, int, int, String, String, String)
      */
-    static private int divideWorldCommandFunction(String heatmapName, CommandSender sender, Vector2d xy1, Vector2d xy2, int divisionCount, boolean doUpdate, String fromDate, String toDate) {
+    static private int divideWorldCommandFunction(String heatmapName, CommandSender sender, Vector2d xy1, Vector2d xy2, int divisionCount, boolean doUpdate, String world, String fromDate, String toDate) {
         int pollRangeSeconds = config.getInt((doUpdate) ? "defaults.pollRangeSeconds" : "defaults.noUpdatePollRangeSeconds");
-        return divideWorldCommandFunction(heatmapName, sender, xy1, xy2, divisionCount, pollRangeSeconds, fromDate, toDate);
+        return divideWorldCommandFunction(heatmapName, sender, xy1, xy2, divisionCount, pollRangeSeconds, world, fromDate, toDate);
     }
 
     /**

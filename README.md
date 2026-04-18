@@ -35,7 +35,7 @@ For example "placeBlock" is worth 1 activity by default.
 
 ### "create" Branch:
 - divideWorld -- This tells the plugin to create a layer that's simply divided into multiple segments between 2 (x,y) points
-  - example: /mmheatmap create divideWorld "layer_name" -1024 -1024 1024 1024 32 "1w"
+  - example: /mmheatmap create divideWorld "layer_name" -1024 -1024 1024 1024 32 "1w" world
   - breakdown:
     - /mmheatmap -- parent command
     - create -- create branch
@@ -44,15 +44,17 @@ For example "placeBlock" is worth 1 activity by default.
     - -1024 -1024 1024 1024 -- x1 y1 x2 y2
     - 32 -- how many divisions to make along each axis
     - "1w" -- how much time to include on the heatmap, 1 week in this case. Each time the layer is polled, it will get data from the range of: {Now-(however long the time period was set to) -> Now}
+    - world -- what world to add the heatmap to
     - ![Example Layer Creation](readmeAssets/exampleCreation.png)
       - In this example, fake player data already existed to show the results
 - divideWorldNoUpdate
-  - example: /mmheatmap create divideWorldNoUpdate "layer_name" -1024 -1024 1024 1024 32 "2026-01-01 00:00:00" "2026-04-16 00:00:00"
+  - example: /mmheatmap create divideWorldNoUpdate "layer_name" -1024 -1024 1024 1024 32 "2026-01-01 00:00:00" "2026-04-16 00:00:00" world
   - breakdown:
     - Many of the same parameters from "divideWorld" exist here, so they will be skipped
     - "2026-01-01 00:00:00" -- (Jan 1st, 2026) When to start gathering player data from the activity database table 
     - "2026-04-16 00:00:00" -- (Apr 16th, 2026) When to stop gathering player data from the activity database table
       - The formatting must strictly follow this format: "yyyy-mm-dd hh:mm:ss"
+    - world -- what world to add the heatmap to
 - caveats:
   - This is executable from console, but it is automatically added to the default world rather than a user defined world
     - This will be fixed eventually to better support console based usage

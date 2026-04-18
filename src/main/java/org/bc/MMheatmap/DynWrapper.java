@@ -259,11 +259,6 @@ public class DynWrapper {
         double cellSizeWidth = (width/layer.divisions);
         double cellSizeHeight = (height/layer.divisions);
 
-
-        // Setting min to the max, and max to the min, will ensure these values will always be set so long as there is more than 1 point
-        // we do this in a separate loop so that we can apply the correct color coating to the cells and avoid doing more math than necessary.
-        // Here we also need to combine nearby areas if they will both be included inside the same heatmap tile, this is to avoid duplicate errors
-        int minActivity = Integer.MAX_VALUE, maxActivity = Integer.MIN_VALUE;
         Map<String, Integer> deDuplicateMap = new HashMap<>();
         for (Map.Entry<String, Integer> kv : points.entrySet()) {
             String[] p1 = kv.getKey().strip().split(",");
@@ -276,10 +271,14 @@ public class DynWrapper {
                 activity += deDuplicateMap.get(key);
             }
 
-            minActivity = Math.min(minActivity, activity);
-            maxActivity = Math.max(maxActivity, activity);
-
             deDuplicateMap.put(key, activity);
+        }
+
+        // Get min and max values after the tiles have been de-duplicated
+        int minActivity = Integer.MAX_VALUE, maxActivity = Integer.MIN_VALUE;
+        for (var x : deDuplicateMap.values()) {
+            minActivity = Math.min(minActivity, x);
+            maxActivity = Math.max(maxActivity, x);
         }
         layer.maxActivity = maxActivity;
         layer.minActivity = minActivity;
@@ -323,7 +322,7 @@ public class DynWrapper {
             if (marker != null) {
                 marker.setFillStyle(config.getDouble("colors.cellOpacity"), colorToInteger(c));
                 marker.setLineStyle(1, config.getDouble("colors.borderOpacity"), colorToInteger(hexToColor(config.getString("colors.borderColor"))));
-                marker.setDescription("Cell ("+index[0]+", "+index[1]+") Activity: " + kv.getValue());
+                marker.setDescription("Activity: " + kv.getValue());
             } else {
                 System.err.println("Error styling area marker, marker is null");
             }
