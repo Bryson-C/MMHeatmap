@@ -9,6 +9,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
+import org.bc.MMheatmap.poller.PlayerActionListener;
 import org.bc.MMheatmap.poller.PlayerActivityPoller;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
@@ -20,6 +21,7 @@ import org.joml.Vector2d;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -253,46 +255,124 @@ public class HeatmapCommand {
         LiteralArgumentBuilder<CommandSourceStack> deleteLayer = Commands.literal("delete")
             .then(Commands.literal("layer")
                 .then(Commands.argument("name", StringArgumentType.string())
-                    .suggests((ctx, builder) -> { database.getHeatmapLayers().entrySet().stream().filter((entry) -> entry.getKey().toLowerCase().startsWith(builder.getRemainingLowerCase())).forEach(x->builder.suggest(x.getKey())); return builder.buildFuture();})
-                        .requires(sender -> sender.getSender().hasPermission("mmheatmap.delete.layer"))
-                        .executes(context -> {
+                .suggests((ctx, builder) -> { database.getHeatmapLayers().entrySet().stream().filter((entry) -> entry.getKey().toLowerCase().startsWith(builder.getRemainingLowerCase())).forEach(x->builder.suggest(x.getKey())); return builder.buildFuture();})
+                    .requires(sender -> sender.getSender().hasPermission("mmheatmap.delete.layer"))
+                    .executes(context -> {
 
-                            Runnable r = () -> {
-                                CommandSender sender = context.getSource().getSender();
-                                sender.sendRichMessage("<blue> Deleting Heatmap Overlay");
+                        Runnable r = () -> {
+                            CommandSender sender = context.getSource().getSender();
+                            sender.sendRichMessage("<blue> Deleting Heatmap Overlay");
 
-                                long startTime = System.nanoTime();
+                            long startTime = System.nanoTime();
 
-                                String layerName = StringArgumentType.getString(context, "name");
+                            String layerName = StringArgumentType.getString(context, "name");
 
-                                // delete here
-                                DynWrapper.deleteAreaSet(layerName);
-                                try {
-                                    database.deleteHeatmapLayer(layerName);
-                                    sender.sendRichMessage("<color:#30f000> Done! (" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime) + "ms)");
-                                } catch (HeatmapDatabase.NoSuchLayerException e) {
-                                    sender.sendRichMessage("<red>Layer \"" + layerName + "\" Does Not Exist");
-                                    // Success since command functioned as intended
-                                    return;
-                                } catch (Exception e) {
-                                    sender.sendRichMessage("<red>Unknown Error Occurred Trying To Delete Layer \"" + layerName + "\"");
-                                }
-                            };
-                            new Thread(r).start();
+                            // delete here
+                            DynWrapper.deleteAreaSet(layerName);
+                            try {
+                                database.deleteHeatmapLayer(layerName);
+                                sender.sendRichMessage("<color:#30f000> Done! (" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime) + "ms)");
+                            } catch (HeatmapDatabase.NoSuchLayerException e) {
+                                sender.sendRichMessage("<red>Layer \"" + layerName + "\" Does Not Exist");
+                                // Success since command functioned as intended
+                                return;
+                            } catch (Exception e) {
+                                sender.sendRichMessage("<red>Unknown Error Occurred Trying To Delete Layer \"" + layerName + "\"");
+                            }
+                        };
+                        new Thread(r).start();
 
-                            return Command.SINGLE_SUCCESS;
-                        })
+                        return Command.SINGLE_SUCCESS;
+                    })
+
+                )
+            )
+            // This command needs to function primarily in 2 ways:
+            // 1. Deleting a single player's data over a certain period of time in a specific range
+            // 2. Deleting all player data in an area over a certain period of time
+            .then(Commands.literal("playerActivity")
+                .then(Commands.argument("world", ArgumentTypes.world())
+                    .then(Commands.argument("player", StringArgumentType.string())
+                    .suggests((ctx, builder) -> { builder.suggest("player_name"); builder.suggest("ALL_PLAYERS"); return builder.buildFuture();})
+                        .then(Commands.argument("x1", IntegerArgumentType.integer()).then(Commands.argument("y1", IntegerArgumentType.integer()).then(Commands.argument("x2", IntegerArgumentType.integer()).then(Commands.argument("y2", IntegerArgumentType.integer())
+                            .then(Commands.literal("dateRange")
+                                // specific date branch
+                                .then(Commands.argument("startdate", StringArgumentType.string())
+                                    .then(Commands.argument("enddate", StringArgumentType.string())
+                                        .requires(sender -> sender.getSender().hasPermission("mmheatmap.delete.playerActivity"))
+                                        .executes(context -> {
+                                            CommandSender sender = context.getSource().getSender();
+                                            Runnable r = () -> {
+                                                sender.sendRichMessage("<green> Deleting Player Activity");
+                                                long start = System.nanoTime();
+                                                deletePlayerActivity(
+                                                        sender,
+                                                        StringArgumentType.getString(context, "player"),
+                                                        StringArgumentType.getString(context, "startdate"),
+                                                        StringArgumentType.getString(context, "enddate"),
+                                                        IntegerArgumentType.getInteger(context, "x1"),
+                                                        IntegerArgumentType.getInteger(context, "y1"),
+                                                        IntegerArgumentType.getInteger(context, "x2"),
+                                                        IntegerArgumentType.getInteger(context, "y2"),
+                                                        context.getArgument("world", World.class)
+                                                );
+                                                sender.sendRichMessage("<green> Done <blue>("+Duration.ofNanos(System.nanoTime()-start).toMillis()+" ms)");
+                                            };
+                                            new Thread(r).start();
+                                            return Command.SINGLE_SUCCESS;
+                                        })
+                                    )
+                                )
+                            )
+                            // relative range branch
+                            .then(Commands.literal("relativeTimePeriod")
+                                .then(Commands.argument("relativetimerange", StringArgumentType.string())
+
+                                    .requires(sender -> sender.getSender().hasPermission("mmheatmap.delete.playerActivity"))
+                                    .executes(context -> {
+                                        Runnable r = () -> {
+                                            CommandSender sender = context.getSource().getSender();
+                                            long pollRangeSeconds = parseTimeStringToSeconds(StringArgumentType.getString(context, "relativetimerange"));
+                                            if (pollRangeSeconds == 0) {
+                                                sender.sendRichMessage("<red>Failed Parsing Time String; Try Formats:");
+                                                sender.sendRichMessage("\"2w,5d,7h,2m,10s\"");
+                                                sender.sendRichMessage("\"2w5d7h2m10s\"");
+                                                sender.sendRichMessage("\"5d2h\"");
+                                                sender.sendRichMessage("\"2.50h\"");
+                                                return;
+                                            }
+                                            String startdate = HeatmapLayer.DateFormat.getDateAsString(HeatmapLayer.DateFormat.getDateNSecondsAgo(HeatmapLayer.DateFormat.nowDate(), pollRangeSeconds));
+                                            String enddate = HeatmapLayer.DateFormat.getDateAsString(HeatmapLayer.DateFormat.nowDate());
+
+
+                                            sender.sendRichMessage("<green> Deleting Player Activity");
+                                            long start = System.nanoTime();
+
+                                            deletePlayerActivity(
+                                                    sender,
+                                                    StringArgumentType.getString(context, "player"),
+                                                    startdate,
+                                                    enddate,
+                                                    IntegerArgumentType.getInteger(context, "x1"),
+                                                    IntegerArgumentType.getInteger(context, "y1"),
+                                                    IntegerArgumentType.getInteger(context, "x2"),
+                                                    IntegerArgumentType.getInteger(context, "y2"),
+                                                    context.getArgument("world", World.class)
+                                            );
+
+                                            sender.sendRichMessage("<green> Done <blue>("+Duration.ofNanos(System.nanoTime()-start).toMillis()+" ms)");
+                                        };
+
+                                        new Thread(r).start();
+                                        return Command.SINGLE_SUCCESS;
+                                    })
+                                )
+                            )
+                        )))
                     )
                 )
-                .then(Commands.literal("playerActivity")
-                    .then(Commands.argument("arguments", StringArgumentType.string()))
-                        .requires(sender -> sender.getSender().hasPermission("mmheatmap.delete.playerActivity"))
-                        .executes(context -> {
-                            // TODO: Implement
-                            // @see HeatmapDatabase#deletePlayerActivity(String playerName, String world)
-                            return Command.SINGLE_SUCCESS;
-                        })
-                );
+            )
+        );
 
         // polling command
         LiteralArgumentBuilder<CommandSourceStack> pollCommand = Commands.literal("poll")
@@ -323,45 +403,17 @@ public class HeatmapCommand {
                                 HeatmapLayer layer = database.getHeatmapLayers().get(layername);
                                 CommandSender sender = context.getSource().getSender();
 
-                                // get the cells which the area lies over
-                                int[] indices1 = DynWrapper.getDividedWorldCellFromPosition(
-                                        layer.topLeft, layer.bottomRight, layer.divisions,
-                                        new Vector2d(IntegerArgumentType.getInteger(context, "x1"), IntegerArgumentType.getInteger(context, "y1"))
-                                );
-                                int[] indices2 = DynWrapper.getDividedWorldCellFromPosition(
-                                        layer.topLeft, layer.bottomRight, layer.divisions,
-                                        new Vector2d(IntegerArgumentType.getInteger(context, "x2"), IntegerArgumentType.getInteger(context, "y2"))
+                                double[] xy1xy2 = DynWrapper.getUpperLeftAndBottomRightCellCoordsFromPoint(
+                                        layer,
+                                        IntegerArgumentType.getInteger(context, "x1"), IntegerArgumentType.getInteger(context, "y1"),
+                                        IntegerArgumentType.getInteger(context, "x2"), IntegerArgumentType.getInteger(context, "y2")
                                 );
 
-                                // then get the top left of the cell furthest to the left
-                                int minCellIndexX = Math.min(indices1[0], indices2[0]);
-                                int maxCellIndexX = Math.max(indices1[0], indices2[0]);
-                                // and the bottom right of the cell furthest to the right
-                                int minCellIndexY = Math.min(indices1[1], indices2[1]);
-                                int maxCellIndexY = Math.max(indices1[1], indices2[1]);
-
-                                // get coords in an easier format
-                                double x1 = layer.topLeft.x(), z1 = layer.topLeft.y();
-                                double x2 = layer.bottomRight.x(), z2 = layer.bottomRight.y();
-
-                                // use math to get total size of area
-                                double width = Math.abs(x1 - x2);
-                                double height = Math.abs(z1 - z2);
-
-                                // get the amount of space each tile should take in the full area
-                                double cellSizeWidth = (width / layer.divisions);
-                                double cellSizeHeight = (height / layer.divisions);
-
-                                double[] xy1 = new double[]{(minCellIndexX * cellSizeWidth) - (width / 2), ((minCellIndexY * cellSizeWidth) + cellSizeWidth) - (width / 2)};
-                                double[] xy2 = new double[]{((maxCellIndexX * cellSizeHeight) - (height / 2)), (((maxCellIndexY * cellSizeHeight) + cellSizeHeight)) - (height / 2)};
-
-                                System.out.printf("Cell Range: [%d, %d] -> [%d, %d]\n", indices1[0], indices1[1], indices2[0], indices2[1]);
-                                System.out.printf("Cell Range Blocks: [%.0f, %.0f] -> [%.0f, %.0f]\n", xy1[0], xy2[0], xy1[1], xy2[1]);
                                 pollHeatmapArea(
                                         sender,
                                         layername,
-                                        new Vector2d(xy1[0], xy1[1]),
-                                        new Vector2d(xy2[0], xy2[1])
+                                        new Vector2d(xy1xy2[0], xy1xy2[1]),
+                                        new Vector2d(xy1xy2[2], xy1xy2[3])
                                 );
                             };
 
@@ -645,6 +697,43 @@ public class HeatmapCommand {
                 return Command.SINGLE_SUCCESS;
             });
 
+        // TODO: Insert data into database as soon as the command is ran
+        LiteralArgumentBuilder<CommandSourceStack> fakePlayerDataCommand = Commands.literal("generateFakeData")
+            .then(Commands.argument("playername", StringArgumentType.string())
+                .then(Commands.argument("world", ArgumentTypes.world())
+                    .then(Commands.argument("x1", IntegerArgumentType.integer()).then(Commands.argument("y1", IntegerArgumentType.integer()).then(Commands.argument("x2", IntegerArgumentType.integer()).then(Commands.argument("y2", IntegerArgumentType.integer())
+                        .then(Commands.argument("count", IntegerArgumentType.integer(1)).then(Commands.argument("minactivity", IntegerArgumentType.integer(1)).then(Commands.argument("maxactivity", IntegerArgumentType.integer(1))
+                            .requires(sender -> sender.getSender().hasPermission("mmheatmap.generateFakePlayerData"))
+                            .executes(context -> {
+                                int count = IntegerArgumentType.getInteger(context, "count");
+                                CommandSender sender = context.getSource().getSender();
+                                sender.sendRichMessage("<green>Generating Fake Player Data");
+                                Runnable r = () -> {
+                                    int x1 = IntegerArgumentType.getInteger(context, "x1"), x2 = IntegerArgumentType.getInteger(context, "x2");
+                                    int y1 = IntegerArgumentType.getInteger(context, "y1"), y2 = IntegerArgumentType.getInteger(context, "y2");
+
+                                    long start = System.nanoTime();
+                                    PlayerActionListener.generateFakePlayerData(
+                                            StringArgumentType.getString(context, "playername"),
+                                            context.getArgument("world", World.class).getName(),
+                                            x1, y1, x2, y2,
+                                            count,
+                                            IntegerArgumentType.getInteger(context, "minactivity"),
+                                            IntegerArgumentType.getInteger(context, "maxactivity")
+                                    );
+                                    sender.sendRichMessage("<green>Done <blue>("+ Duration.ofNanos(System.nanoTime() - start).toMillis() +"ms)");
+                                    sender.sendRichMessage("<green>Changes will appear after next poll period");
+                                };
+
+                                new Thread(r).start();
+                                return Command.SINGLE_SUCCESS;
+                            })
+                        )))
+                    )))
+                )
+            )
+        );
+
 
         // TODO: Benchmarking Command
         LiteralArgumentBuilder<CommandSourceStack> benchamarkCommand = Commands.literal("benchmark")
@@ -671,6 +760,7 @@ public class HeatmapCommand {
         createHeatmap.then(divideWorldNoUpdate);
         commandRoot.then(createHeatmap);
 
+        commandRoot.then(fakePlayerDataCommand);
         commandRoot.then(deleteLayer);
         commandRoot.then(pollCommand);
         commandRoot.then(resyncCommand);
@@ -740,8 +830,7 @@ public class HeatmapCommand {
             }
 
         } catch (Exception e) {
-            System.err.printf("Failed To Create Marker: %s\n", e.getMessage());
-            sender.sendRichMessage("<red>Failed Creating Dynmap Marker; See Console");
+            sender.sendRichMessage("<red>Failed To Create Marker: " + e.getMessage());
             return Command.SINGLE_SUCCESS;
         }
 
@@ -954,6 +1043,119 @@ public class HeatmapCommand {
         Pattern pattern = Pattern.compile("(\\d{4}-\\d{2}-\\d{2}\\s\\d{2}:\\d{2}:\\d{2})", Pattern.CASE_INSENSITIVE);
         Matcher matcher = pattern.matcher(date);
         return matcher.find();
+    }
+
+    // TODO: Finish implementing
+
+    /**
+     * NOTE: Not threaded by default
+     * @param sender
+     * @param targetPlayer
+     * @param startdate
+     * @param enddate
+     * @param x1
+     * @param y1
+     * @param x2
+     * @param y2
+     * @param world
+     */
+    private static void deletePlayerActivity(CommandSender sender, String targetPlayer, String startdate, String enddate, int x1, int y1, int x2, int y2, World world) {
+
+        // Because of the nature of deleting data, all maps using the data must be re-polled. This can be an expensive operation, and take a while, so first pause polling
+        PlayerActivityPoller.pausePolling();
+
+        database.executeSql((connection) -> {
+            try {
+
+                if (!isValidDateString(startdate)) {
+                    sender.sendRichMessage("<red>Argument \"startdate\" Has Invalid Date Format, Format As Follows: \"yyyy-mm-dd hh:mm:ss\"");
+                    return -1;
+                }
+                if (!isValidDateString(enddate)) {
+                    sender.sendRichMessage("<red>Argument \"enddate\" Has Invalid Date Format, Format As Follows: \"yyyy-mm-dd hh:mm:ss\"");
+                    return -1;
+                }
+
+
+                PreparedStatement stmt;
+
+                // normal case: player is named, include that in the parameters
+                if (!targetPlayer.equals("ALL_PLAYERS")) {
+                    stmt = connection.prepareStatement("DELETE FROM `player_activity` WHERE xpos > ? AND xpos < ? AND ypos > ? AND ypos < ? AND world_name = ? AND datetime >= '" + startdate + "' AND datetime <= '" + enddate + "' AND player_name = ?");
+                    stmt.setString(6, targetPlayer);
+                }
+                // special case to include all players, in this case, player name should not be included
+                else {
+                    stmt = connection.prepareStatement("DELETE FROM `player_activity` WHERE xpos > ? AND xpos < ? AND ypos > ? AND ypos < ? AND world_name = ? AND datetime >= '" + startdate + "' AND datetime <= '" + enddate + "'");
+                }
+                stmt.setInt(1, x1);
+                stmt.setInt(2, x2);
+                stmt.setInt(3, y1);
+                stmt.setInt(4, y2);
+                stmt.setString(5, world.getName());
+
+                stmt.execute();
+            } catch (Exception e) {
+                sender.sendRichMessage("<red> Error Deleting Player Data: " + e.getMessage());
+            }
+
+            return 0;
+        });
+
+        for (HeatmapLayer layer : database.getHeatmapLayers().values()) {
+            // skip layers that are not in the world
+            if (!layer.world.equals(world.getName())) continue;
+
+            // For cell recreation, since data is simply missing, we have to use the expensive operation of "recreating" the map to ensure data is accurate.
+
+            long start = System.nanoTime();
+
+            // Recreate cells
+            // first, delete old cells to avoid duplication errors (also we simply don't need them)
+            DynWrapper.deleteAreaSet(layer.label);
+            // recreate set after deletion
+            MarkerSet layerSet = DynWrapper.getAreaSetOrCreate(layer.label);
+            // redivide world
+            DynWrapper.divideWorld(layerSet, layer.world, layer.topLeft, layer.bottomRight, layer.divisions);
+
+
+            // a special case must be used to get non-updating heatmap's from and to dates
+            if (layer.pollRangeSeconds == config.getInt("defaults.noUpdatePollRangeSeconds")) {
+                String dateString = database.executeSql((connection) -> {
+                    try {
+                        PreparedStatement stmt = connection.prepareStatement("SELECT `fromToDate` FROM `heatmap_layers` WHERE `dyn_id` = ? AND `dyn_label` = ?");
+                        stmt.setString(1, layer.id);
+                        stmt.setString(2, layer.label);
+
+                        ResultSet set = stmt.executeQuery();
+                        // TODO: Consider Making This Function Return A List
+                        while (set.next()) {
+                            String str = set.getString("fromToDate");
+                            if (!str.isEmpty())
+                                return str;
+                        }
+                    } catch (Exception e) {
+                        sender.sendRichMessage("<red> Error Getting Date Range Of Layer <b>" + layer.label);
+                    }
+                    return "";
+                });
+                try {
+                    String[] dates = dateString.split(",");
+                    pollHeatmapCommandFunction(sender, layer.label, dates[0],dates[1]);
+                } catch (Exception e) {
+                    sender.sendRichMessage("<b>Date Range: <red>Error Getting Data");
+                    sender.sendRichMessage("<red>" + e.getMessage());
+                }
+            } else {
+                pollHeatmapCommandFunction(sender, layer.label, null, null);
+            }
+
+            sender.sendRichMessage("<green>Re-polled Layer <blue>("+Duration.ofNanos(System.nanoTime()-start).toMillis()+" ms)");
+        }
+
+        // Once that is done, we can resume polling
+        PlayerActivityPoller.resumePolling();
+
     }
 
 }

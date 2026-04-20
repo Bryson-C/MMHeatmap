@@ -13,6 +13,7 @@ import java.sql.ResultSet;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.logging.Logger;
 
 
 /**
@@ -28,6 +29,7 @@ import java.util.*;
  */
 public class HeatmapDatabase {
     private static HikariDataSource dataSource;
+    private static Logger logger;
 
     // try to keep this up to date with each deletion and insertion of the database,
     // this will save a lot of time
@@ -43,7 +45,7 @@ public class HeatmapDatabase {
      *
      * @see HeatmapDatabase
      */
-    public HeatmapDatabase(FileConfiguration configFile) {
+    public HeatmapDatabase(FileConfiguration configFile, Logger logger) {
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl(configFile.getString("database.address")); // Address of your running MySQL database
         config.setUsername(configFile.getString("database.username")); // Username
@@ -82,7 +84,7 @@ public class HeatmapDatabase {
             }
         } catch (Exception e) {
             // Handle any exceptions that arise from getting / handing the exception
-            System.err.println("Failed Running Database Query: " + e.getMessage());
+            logger.warning("Failed Running Database Query: " + e.getMessage());
         }
     }
 
@@ -115,7 +117,7 @@ public class HeatmapDatabase {
             statement.execute();
         } catch (Exception e) {
             // Handle any exceptions that arise from getting / handing the exception
-            System.err.println("Failed Running Database Query: " + e.getMessage());
+            logger.warning("Failed Running Database Query: " + e.getMessage());
         }
     }
 
@@ -135,7 +137,7 @@ public class HeatmapDatabase {
             statement.execute();
         } catch (Exception e) {
             // Handle any exceptions that arise from getting / handing the exception
-            System.err.println("Failed Running Database Query: " + e.getMessage());
+            logger.warning("Failed Running Database Query: " + e.getMessage());
         }
     }
 
@@ -168,7 +170,7 @@ public class HeatmapDatabase {
             return function.run(connection);
         } catch (Exception e) {
             // Handle any exceptions that arise from getting / handing the exception
-            System.err.println("Failed Running Database Query: " + e.getMessage());
+            logger.warning("Failed Running Database Query: " + e.getMessage());
         }
         return null;
     }
@@ -221,7 +223,7 @@ public class HeatmapDatabase {
 
         } catch (Exception e) {
             // Handle any exceptions that arise from getting / handing the exception
-            System.err.println("Failed Running Database Query: " + e.getMessage());
+            logger.warning("Failed Running Database Query: " + e.getMessage());
         }
     }
 
@@ -259,7 +261,7 @@ public class HeatmapDatabase {
         }
         catch (Exception e) {
             // Handle any exceptions that arise from getting / handing the exception
-            System.err.println("Failed Running Database Query: " + e.getMessage());
+            logger.warning("Failed Running Database Query: " + e.getMessage());
         }
     }
 
@@ -293,16 +295,9 @@ public class HeatmapDatabase {
 
         } catch (Exception e) {
             // Handle any exceptions that arise from getting / handing the exception
-            System.err.println("Failed Running Database Query: " + e.getMessage());
+            logger.warning("Failed Running Database Query: " + e.getMessage());
         }
     }
-
-    /**
-     * TODO: Implement using datetime information, and confirmation
-     * @param playerName
-     * @param world
-     */
-    public void deletePlayerActivity(String playerName, String world) {}
 
 
     /**
@@ -348,7 +343,7 @@ public class HeatmapDatabase {
 
         } catch (Exception e) {
             // Handle any exceptions that arise from getting / handing the exception
-            System.err.println("Failed Running Database Query: " + e.getMessage());
+            logger.warning("Failed Running Database Query: " + e.getMessage());
         }
 
         return activity;
@@ -389,7 +384,7 @@ public class HeatmapDatabase {
 
         } catch (Exception e) {
             // Handle any exceptions that arise from getting / handing the exception
-            System.err.println("Failed Running Database Query: " + e.getMessage());
+            logger.warning("Failed Running Database Query: " + e.getMessage());
         }
 
         return activity;
@@ -417,8 +412,6 @@ public class HeatmapDatabase {
             statement.setInt(4, (int)layer.bottomRight.y);
             statement.setString(5, layer.world);
 
-            System.out.println("Query: "+statement);
-
             ResultSet result = statement.executeQuery();
 
             // Here is not adding up duplicate areas correctly, it only takes the most recent entries
@@ -434,8 +427,8 @@ public class HeatmapDatabase {
 
         } catch (Exception e) {
             // Handle any exceptions that arise from getting / handing the exception
-            System.err.println("Failed Running Database Query: " + e.getMessage());
-            System.err.println("If Query Failed, Double Check Time Format Is \"yyyy-mm-dd hh:mm:ss\"");
+            logger.warning("Failed Running Database Query: " + e.getMessage());
+            logger.warning("If Query Failed, Double Check Time Format Is \"yyyy-mm-dd hh:mm:ss\"");
         }
 
         return activity;

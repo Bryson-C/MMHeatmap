@@ -16,6 +16,7 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.*;
 import org.dynmap.markers.PlayerSet;
 
+import java.io.RandomAccessFile;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -88,15 +89,27 @@ public class PlayerActionListener implements Listener {
 
 
     /**
-     * TODO: add more flexible options to allow this to be used in the future "benchmark" command branch
-     *
      * Generates fake player activity for testing the heatmap
+     * Note: Data is not returned, to insert data to the database, you should poll the map
+     *
+     * @param playerName The playername you want to insert the data under, should be unique compared to normal player names
+     * @param world The world to add the data to, generally the world you are in
+     * @param x1 Top left x point
+     * @param y1 Top left y point
+     * @param x2 Bottom right x point
+     * @param y2 Bottom right y point
+     * @param count How many data points to generate
+     * @param minActivity minimum amount of activity that can be added for any data point
+     * @param maxActivity maximum amount of activity that can be added for any data point
      */
-    public static void generateFakePlayerData(int count, int minActivity, int maxActivity) {
+    public static void generateFakePlayerData(String playerName, String world, int x1, int y1, int x2, int y2, int count, int minActivity, int maxActivity) {
         Random r = new Random();
+
+        int chunkX1 = x1/16, chunkX2 = x2/16;
+        int chunkY1 = y1/16, chunkY2 = y2/16;
+
         for (int i = 0; i < count; i++) {
-            String key = String.format("%s;%d,%d", "world", r.nextInt(2500)-1250, r.nextInt(2500)-1250);
-            String playerName = "debugplayer";
+            String key = String.format("%s;%d,%d", world, r.nextInt(chunkX1, chunkX2), r.nextInt(chunkY1, chunkY2));
 
             if (!playerActions.containsKey(key)) {
                 playerActions.put(key, new HashMap<>());
@@ -139,13 +152,11 @@ public class PlayerActionListener implements Listener {
     public static void onPlayerPlace(BlockPlaceEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
         actions.activity += playerPlaceWeight;
-        event.getPlayer().sendRichMessage("<b>chunk interactions: <reset>" + actions.toRichMessage());
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerBreak(BlockBreakEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getBlock().getChunk(), event.getPlayer());
         actions.activity += playerBreakWeight;
-        event.getPlayer().sendRichMessage("<b>chunk interactions: <reset>" + actions.toRichMessage());
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerSetSpawn(PlayerSetSpawnEvent event) {
@@ -153,91 +164,76 @@ public class PlayerActionListener implements Listener {
         if (loc == null) return;
         PlayerChunkInteractions actions = getPlayerChunkInteractions(loc.getChunk(), event.getPlayer());
         actions.activity += playerSetSpawnWeight;
-        event.getPlayer().sendRichMessage("<b>chunk interactions: <reset>" + actions.toRichMessage());
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerBedEnter(PlayerBedEnterEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getBed().getLocation().getChunk(), event.getPlayer());
         actions.activity += playerBedEnterWeight;
-        event.getPlayer().sendRichMessage("<b>chunk interactions: <reset>" + actions.toRichMessage());
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerLeaveBed(PlayerBedLeaveEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getBed().getLocation().getChunk(), event.getPlayer());
         actions.activity += playerLeaveBedWeight;
-        event.getPlayer().sendRichMessage("<b>chunk interactions: <reset>" + actions.toRichMessage());
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerChangeBeaconEffect(PlayerChangeBeaconEffectEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getBeacon().getLocation().getChunk(), event.getPlayer());
         actions.activity += playerChangeBeaconEffectWeight;
-        event.getPlayer().sendRichMessage("<b>chunk interactions: <reset>" + actions.toRichMessage());
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerChangedWorldEvent(PlayerChangedWorldEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
         actions.activity += playerChangedWorldEventWeight;
-        event.getPlayer().sendRichMessage("<b>chunk interactions: <reset>" + actions.toRichMessage());
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerFishEvent(PlayerFishEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
         actions.activity += playerFishEventWeight;
-        event.getPlayer().sendRichMessage("<b>chunk interactions: <reset>" + actions.toRichMessage());
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerFlowerPotManipulateEvent(PlayerFlowerPotManipulateEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
         actions.activity += playerFlowerPotManipulateEventWeight;
-        event.getPlayer().sendRichMessage("<b>chunk interactions: <reset>" + actions.toRichMessage());
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerArmorStandManipulateEvent(PlayerArmorStandManipulateEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
         actions.activity += playerArmorStandManipulateEventWeight;
-        event.getPlayer().sendRichMessage("<b>chunk interactions: <reset>" + actions.toRichMessage());
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerHarvestBlockEvent(PlayerHarvestBlockEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
         actions.activity += playerHarvestBlockEventWeight;
-        event.getPlayer().sendRichMessage("<b>chunk interactions: <reset>" + actions.toRichMessage());
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerInsertLecternEvent(PlayerInsertLecternBookEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getBlock().getChunk(), event.getPlayer());
         actions.activity += playerInsertLecternEventWeight;
-        event.getPlayer().sendRichMessage("<b>chunk interactions: <reset>" + actions.toRichMessage());
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerItemFrameChangeEvent(PlayerItemFrameChangeEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
         actions.activity += playerItemFrameChangeEventWeight;
-        event.getPlayer().sendRichMessage("<b>chunk interactions: <reset>" + actions.toRichMessage());
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerPurchaseEvent(PlayerPurchaseEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
         actions.activity += playerPurchaseEventWeight;
-        event.getPlayer().sendRichMessage("<b>chunk interactions: <reset>" + actions.toRichMessage());
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerShearBlockEvent(PlayerShearBlockEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getBlock().getChunk(), event.getPlayer());
         actions.activity += playerShearBlockEventWeight;
-        event.getPlayer().sendRichMessage("<b>chunk interactions: <reset>" + actions.toRichMessage());
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerShearEntityEvent(PlayerShearEntityEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
         actions.activity += playerShearEntityEventWeight;
-        event.getPlayer().sendRichMessage("<b>chunk interactions: <reset>" + actions.toRichMessage());
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerTakeLecternBookEvent(PlayerTakeLecternBookEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
         actions.activity += playerTakeLecternBookEventWeight;
-        event.getPlayer().sendRichMessage("<b>chunk interactions: <reset>" + actions.toRichMessage());
     }
 
     /**

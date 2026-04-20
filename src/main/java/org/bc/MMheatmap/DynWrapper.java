@@ -1,5 +1,6 @@
 package org.bc.MMheatmap;
 
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.dynmap.DynmapCommonAPI;
 import org.dynmap.markers.AreaMarker;
@@ -11,6 +12,7 @@ import java.awt.*;
 import java.awt.geom.Area;
 import java.io.File;
 import java.util.*;
+import java.util.logging.Logger;
 
 
 /**
@@ -22,6 +24,7 @@ public class DynWrapper {
     private static DynmapCommonAPI api;
     private static FileConfiguration config;
     private static ArrayList<Color> colors;
+    private static Logger logger;
 
     /**
      * Constructor setting the Dynmap Api to a given api and config variable to be used within the entire class
@@ -29,10 +32,11 @@ public class DynWrapper {
      * @param api The Dynmap Api object to be saved within the class for later method calls
      * @param config The plugin config which controls much of the design of heatmap cells
      */
-    public DynWrapper(DynmapCommonAPI api, FileConfiguration config) {
+    public DynWrapper(DynmapCommonAPI api, FileConfiguration config, Logger logger) {
         DynWrapper.api = api;
         DynWrapper.config = config;
         DynWrapper.colors = createColorArray(config);
+        DynWrapper.logger = logger;
     }
 
     /**
@@ -232,6 +236,44 @@ public class DynWrapper {
         return new int[]{x,y};
     }
 
+
+    /**
+     * @param layer The heatmap layer to get the cells from
+     * @param x1 The block coordinates of the x position in the first point
+     * @param y1 The block coordinates of the y position in the first point
+     * @param x2 The block coordinates of the x position in the second point
+     * @param y2 The block coordinates of the y position in the second point
+     * @return Returns an array of positions which are the top left point of the top left cell in the range,
+     *         and the bottom left coordinate of the bottom right cell in format: [topLeftX, topLeftY, bottomRightX, bottomRightY]
+     */
+    public static double[] getUpperLeftAndBottomRightCellCoordsFromPoint(HeatmapLayer layer, int x1, int y1, int x2, int y2) {
+        // get the cells which the area lies over (indices1[0], indices1[1]) -> (indices2[0], indices2[1])
+        int[] indices1 = DynWrapper.getDividedWorldCellFromPosition(layer.topLeft, layer.bottomRight, layer.divisions, new Vector2d(x1, y1));
+        int[] indices2 = DynWrapper.getDividedWorldCellFromPosition(layer.topLeft, layer.bottomRight, layer.divisions, new Vector2d(x2, y2));
+
+        // then get the top left of the cell furthest to the left
+        int minCellIndexX = Math.min(indices1[0], indices2[0]);
+        int maxCellIndexX = Math.max(indices1[0], indices2[0]);
+        // and the bottom right of the cell furthest to the right
+        int minCellIndexY = Math.min(indices1[1], indices2[1]);
+        int maxCellIndexY = Math.max(indices1[1], indices2[1]);
+
+        // use math to get total size of area
+        double width = Math.abs(layer.topLeft.x() - layer.bottomRight.x());
+        double height = Math.abs(layer.topLeft.y() - layer.bottomRight.y());
+
+        // get the amount of space each tile should take in the full area
+        double cellSizeWidth = (width / layer.divisions);
+        double cellSizeHeight = (height / layer.divisions);
+
+        // Blocks In Top Left And Bottom Right Points Of The Cells Within The Range (xy1[0], xy2[0]) -> (xy1[1], xy2[1])
+        return new double[]{
+                (minCellIndexX * cellSizeWidth) - (width / 2), ((maxCellIndexX * cellSizeHeight) - (height / 2)),
+                ((minCellIndexY * cellSizeWidth) + cellSizeWidth) - (width / 2), (((maxCellIndexY * cellSizeHeight) + cellSizeHeight)) - (height / 2)
+        };
+    }
+
+
     /**
      * When given a layer, cells will be created and styled based on activity levels in said cell
      *
@@ -324,7 +366,7 @@ public class DynWrapper {
                 marker.setLineStyle(1, config.getDouble("colors.borderOpacity"), colorToInteger(hexToColor(config.getString("colors.borderColor"))));
                 marker.setDescription("Activity: " + kv.getValue());
             } else {
-                System.err.println("Error styling area marker, marker is null");
+                logger.warning("Error styling area marker, marker is null");
             }
         }
     }
@@ -415,7 +457,7 @@ public class DynWrapper {
                 marker.setLineStyle(1, config.getDouble("colors.borderOpacity"), colorToInteger(hexToColor(config.getString("colors.borderColor"))));
                 marker.setDescription("Cell ("+index[0]+", "+index[1]+") Activity: " + kv.getValue());
             } else {
-                System.err.println("Error styling area marker, marker is null");
+                logger.warning("Error styling area marker, marker is null");
             }
         }
 

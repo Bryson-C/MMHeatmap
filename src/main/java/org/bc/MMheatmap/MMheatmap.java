@@ -19,15 +19,16 @@ public final class MMheatmap extends JavaPlugin {
 
         // save config so data can be fetched, only need to use this when I start using the config
         getPlugin(MMheatmap.class).saveConfig();
+        saveDefaultConfig();
 
         // Register the dynmap listener to allow access to the API once it becomes available
         DynmapCommonAPIListener.register(new DynmapListener());
 
         // Create a database object
-        HeatmapDatabase database = new HeatmapDatabase(getConfig());
+        HeatmapDatabase database = new HeatmapDatabase(getConfig(), getLogger());
 
         // Create a dynmap wrapper
-        DynWrapper wrapper = new DynWrapper(DynmapListener.getApi(), getConfig());
+        new DynWrapper(DynmapListener.getApi(), getConfig(), getLogger());
 
         // Enable Poller
         new PlayerActivityPoller(getPlugin(MMheatmap.class), getServer(), database, getConfig());

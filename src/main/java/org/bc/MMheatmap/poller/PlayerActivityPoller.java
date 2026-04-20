@@ -60,7 +60,7 @@ public class PlayerActivityPoller {
             // Do not do work if the poller was paused
             if (paused) return;
 
-            PlayerActionListener.generateFakePlayerData(500, 0, 200);
+
             var playerActions = PlayerActionListener.getPlayerActions();
 
             // Typically I would not recommend using "var", but god do I hate typing collection types
@@ -68,7 +68,7 @@ public class PlayerActivityPoller {
                 String[] split = entry.getKey().split(";");
 
                 if (split.length < 2) {
-                    System.err.println("Failed Splitting Location Data; Skipping");
+                    // System.err.println("Failed Splitting Location Data; Skipping");
                     continue;
                 }
 

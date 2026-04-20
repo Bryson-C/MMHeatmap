@@ -31,6 +31,7 @@ For example "placeBlock" is worth 1 activity by default.
    - modify
    - poll
    - resync
+   - generateFakeData
    - benchmark
 
 ### "create" Branch:
@@ -65,7 +66,16 @@ For example "placeBlock" is worth 1 activity by default.
    - example: /mmheatmap delete layer "layer_name"
    - breakdown: this will simply delete the layer under the name "layer_name" from the database and remove it from the dynmap 
  - playerActivity
-    - <p style="color:red">Not yet implemented</p>
+   - example: /mmheatmap delete playerActivity minecraft:overworld ALL_PLAYERS -750 -750 750 750 relativeTimePeriod "2w"
+   - ![example player activity deletion](readmeAssets/exampleDeletePlayerActivity.png)
+   - breakdown:
+     - minecraft:overworld -- The world to delete the data from, because data belongs to a world, not a layer, a world is required rather than a layer name
+     - ALL_PLAYERS -- This is a special case, it will remove all player data from an area, but a specific player name can also be put in this argument 
+     - -750 -750 750 750
+     - relativeTimePeriod -- The time mode to be used, relativeTimePeriod uses strings such as: "2w", "3d" (standing for 2 weeks and 3 days)
+       - This parameter can also be dateRange, example: dateRange "2026-01-01 00:00:00" "2026-12-31 00:00:00"
+     - "2w" -- a time string, this specifically stands for 2 weeks
+    
 
 ### "info" Branch:
  - heatmapLayers
@@ -114,8 +124,20 @@ For example "placeBlock" is worth 1 activity by default.
  - example: /mmheatmap resync
  - breakdown: if the plugin and the database become unsynced (for whatever reason), this will resynchronize them. This is also done on startup of the plugin
 
+### "generateFakeData" Branch:
+ - example: /mmheatmap generateFakeData "debugplayer" minecraft:overworld -2000 -2000 2000 2000 5000 200 10000
+   - ![example fake player data generation](readmeAssets/exampleFakePlayerDataGeneration.png)
+ - breakdown: 
+   - "debugplayer" -- the name you want to insert into the database, may be a player name, but should be a unique name only used for testing
+   - minecraft:overworld -- the world to add the data to
+   - -2000 -2000 2000 2000 -- x1 y1 x2 y2
+   - 5000 200 10000 -- data point count (how many data points to generate), minimum activity for a data point, maximum activity for a data point
+   - caveat:
+     - Currently fake data is generated and not automatically inserted to the database, only during polling periods. I can fix this, im just lazy
+
+
 ### "benchmark" Branch:
-- <p style="color:red">TODO: Implement</p>
+- TODO: Implement
 
 ## Permissions
 - /mmheatmap info
@@ -152,7 +174,9 @@ For example "placeBlock" is worth 1 activity by default.
   - mmheatmap.info.heatmapLayers
 - /mmheatmap resync
   - mmheatmap.resync
+- /mmheatmap generateFakePlayerData ...
+  - mmheatmap.generateFakeData
 - /mmheatmap benchmark
-    - <p style="color:red">TODO: Implement</p>
+  - TODO: Implement
 - /mmheatmap ...
   - mmheatmap.root

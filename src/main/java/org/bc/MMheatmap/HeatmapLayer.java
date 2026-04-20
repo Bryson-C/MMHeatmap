@@ -48,7 +48,7 @@ public class HeatmapLayer {
             return date.minusSeconds(seconds);
         }
         static public LocalDateTime getDateFromString(String dateString) {
-            return LocalDateTime.parse(dateString,DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"));
+            return LocalDateTime.parse(dateString, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         }
     }
 
