@@ -2,6 +2,7 @@ database:
   address: 'jdbc:mysql://address:port/database'
   username: 'username'
   password: 'password'
+  serverTablePrefix: 'mainserver'
 
 defaults:
   world_name: 'world'

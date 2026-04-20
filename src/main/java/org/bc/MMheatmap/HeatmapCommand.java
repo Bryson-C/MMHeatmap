@@ -91,7 +91,7 @@ public class HeatmapCommand {
                                 if (layer.pollRangeSeconds == config.getInt("defaults.noUpdatePollRangeSeconds")) {
                                     String dateString = database.executeSql((connection) -> {
                                         try {
-                                            PreparedStatement stmt = connection.prepareStatement("SELECT `fromToDate` FROM `heatmap_layers` WHERE `dyn_id` = ? AND `dyn_label` = ?");
+                                            PreparedStatement stmt = connection.prepareStatement("SELECT `fromToDate` FROM `"+HeatmapDatabase.getHeatmapLayerTableName()+"` WHERE `dyn_id` = ? AND `dyn_label` = ?");
                                             stmt.setString(1, layer.id);
                                             stmt.setString(2, layer.label);
 
@@ -472,7 +472,7 @@ public class HeatmapCommand {
 
                                 database.executeSql((connection)->{
                                     try {
-                                        PreparedStatement statement = connection.prepareStatement("UPDATE `heatmap_layers`SET `point_one_coords`= ?,`point_two_coords`= ? WHERE `dyn_id` = ? AND `dyn_label` = ?;");
+                                        PreparedStatement statement = connection.prepareStatement("UPDATE `"+HeatmapDatabase.getHeatmapLayerTableName()+"` SET `point_one_coords`= ?,`point_two_coords`= ? WHERE `dyn_id` = ? AND `dyn_label` = ?;");
                                         statement.setString(1, HeatmapLayer.vec2dToString(layer.topLeft));
                                         statement.setString(2, HeatmapLayer.vec2dToString(layer.bottomRight));
                                         statement.setString(3, layer.id);
@@ -536,7 +536,7 @@ public class HeatmapCommand {
 
                                     database.executeSql((connection) -> {
                                         try {
-                                            PreparedStatement statement = connection.prepareStatement("UPDATE `heatmap_layers`SET `fromToDate`= ? WHERE `dyn_id` = ? AND `dyn_label` = ?;");
+                                            PreparedStatement statement = connection.prepareStatement("UPDATE `"+HeatmapDatabase.getHeatmapLayerTableName()+"`SET `fromToDate`= ? WHERE `dyn_id` = ? AND `dyn_label` = ?;");
                                             statement.setString(1, String.format("%s,%s", startdate, enddate));
                                             statement.setString(2, layer.id);
                                             statement.setString(3, layer.label);
@@ -588,7 +588,7 @@ public class HeatmapCommand {
 
                                 database.executeSql((connection)->{
                                     try {
-                                        PreparedStatement statement = connection.prepareStatement("UPDATE `heatmap_layers` SET `poll_range_seconds` = ? WHERE `dyn_id` = ? AND `dyn_label` = ?;");
+                                        PreparedStatement statement = connection.prepareStatement("UPDATE `"+HeatmapDatabase.getHeatmapLayerTableName()+"` SET `poll_range_seconds` = ? WHERE `dyn_id` = ? AND `dyn_label` = ?;");
                                         statement.setInt(1, layer.pollRangeSeconds);
                                         statement.setString(2, layer.id);
                                         statement.setString(3, layer.label);
@@ -623,7 +623,7 @@ public class HeatmapCommand {
 
                                 database.executeSql((connection) -> {
                                     try {
-                                        PreparedStatement statement = connection.prepareStatement("UPDATE `heatmap_layers` SET `divisions` = ? WHERE `dyn_id` = ? AND `dyn_label` = ?;");
+                                        PreparedStatement statement = connection.prepareStatement("UPDATE `"+HeatmapDatabase.getHeatmapLayerTableName()+"` SET `divisions` = ? WHERE `dyn_id` = ? AND `dyn_label` = ?;");
                                         statement.setInt(1, layer.divisions);
                                         statement.setString(2, layer.id);
                                         statement.setString(3, layer.label);
@@ -1113,12 +1113,12 @@ public class HeatmapCommand {
 
                 // normal case: player is named, include that in the parameters
                 if (!targetPlayer.equals("ALL_PLAYERS")) {
-                    stmt = connection.prepareStatement("DELETE FROM `player_activity` WHERE xpos > ? AND xpos < ? AND ypos > ? AND ypos < ? AND world_name = ? AND datetime >= '" + startdate + "' AND datetime <= '" + enddate + "' AND player_name = ?");
+                    stmt = connection.prepareStatement("DELETE FROM `"+HeatmapDatabase.getHeatmapPlayerActivityTableName()+"` WHERE xpos > ? AND xpos < ? AND ypos > ? AND ypos < ? AND world_name = ? AND datetime >= '" + startdate + "' AND datetime <= '" + enddate + "' AND player_name = ?");
                     stmt.setString(6, targetPlayer);
                 }
                 // special case to include all players, in this case, player name should not be included
                 else {
-                    stmt = connection.prepareStatement("DELETE FROM `player_activity` WHERE xpos > ? AND xpos < ? AND ypos > ? AND ypos < ? AND world_name = ? AND datetime >= '" + startdate + "' AND datetime <= '" + enddate + "'");
+                    stmt = connection.prepareStatement("DELETE FROM `"+HeatmapDatabase.getHeatmapPlayerActivityTableName()+"` WHERE xpos > ? AND xpos < ? AND ypos > ? AND ypos < ? AND world_name = ? AND datetime >= '" + startdate + "' AND datetime <= '" + enddate + "'");
                 }
                 stmt.setInt(1, x1);
                 stmt.setInt(2, x2);
@@ -1155,7 +1155,7 @@ public class HeatmapCommand {
             if (layer.pollRangeSeconds == config.getInt("defaults.noUpdatePollRangeSeconds")) {
                 String dateString = database.executeSql((connection) -> {
                     try {
-                        PreparedStatement stmt = connection.prepareStatement("SELECT `fromToDate` FROM `heatmap_layers` WHERE `dyn_id` = ? AND `dyn_label` = ?");
+                        PreparedStatement stmt = connection.prepareStatement("SELECT `fromToDate` FROM `"+HeatmapDatabase.getHeatmapLayerTableName()+"` WHERE `dyn_id` = ? AND `dyn_label` = ?");
                         stmt.setString(1, layer.id);
                         stmt.setString(2, layer.label);
 

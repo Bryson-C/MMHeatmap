@@ -30,6 +30,14 @@ import java.util.logging.Logger;
 public class HeatmapDatabase {
     private static HikariDataSource dataSource;
     private static Logger logger;
+    private static FileConfiguration config;
+
+    public static String getHeatmapLayerTableName() {
+        return String.format("%s_%s",config.getString("database.serverTablePrefix"),"heatmap_layers");
+    }
+    public static String getHeatmapPlayerActivityTableName() {
+        return String.format("%s_%s",config.getString("database.serverTablePrefix"),"player_activity");
+    }
 
     // try to keep this up to date with each deletion and insertion of the database,
     // this will save a lot of time
@@ -53,6 +61,8 @@ public class HeatmapDatabase {
         config.setMaximumPoolSize(10); // Pool size defaults to 10
         config.addDataSourceProperty("", ""); // MISC settings to add
 
+        HeatmapDatabase.config = configFile;
+
         dataSource = new HikariDataSource(config);
         resyncHeatmapDatabase();
     }
@@ -66,7 +76,7 @@ public class HeatmapDatabase {
     private void cacheHeatmapLayers() {
         cachedLayers.clear();
         try (Connection connection = dataSource.getConnection()) {
-            PreparedStatement statement = connection.prepareStatement("SELECT `dyn_id`, `dyn_label`, `point_one_coords`, `point_two_coords`, `divisions`, `world_name`, `poll_range_seconds` From `heatmap_layers`");
+            PreparedStatement statement = connection.prepareStatement("SELECT `dyn_id`, `dyn_label`, `point_one_coords`, `point_two_coords`, `divisions`, `world_name`, `poll_range_seconds` FROM `"+getHeatmapLayerTableName()+"`");
             ResultSet result = statement.executeQuery();
 
             while (result.next()) {
@@ -108,7 +118,7 @@ public class HeatmapDatabase {
      */
     private void createLayerTableIfNotExists() {
         try (Connection connection = dataSource.getConnection()) {
-            String Sql = "CREATE TABLE IF NOT EXISTS `heatmap_layers` (`id` INT NOT NULL AUTO_INCREMENT ," +
+            String Sql = "CREATE TABLE IF NOT EXISTS `"+getHeatmapLayerTableName()+"` (`id` INT NOT NULL AUTO_INCREMENT ," +
                          " `dyn_id` VARCHAR(32) NOT NULL , `dyn_label` VARCHAR(32) NOT NULL , `point_one_coords` VARCHAR(64) NOT NULL ," +
                          " `point_two_coords` VARCHAR(64) NOT NULL , `divisions` INT NOT NULL , `world_name` VARCHAR(32) NOT NULL , `poll_range_seconds` INT NOT NULL, " +
                          " `fromToDate` VARCHAR(48) NOT NULL, PRIMARY KEY (`id`)) ENGINE = InnoDB;";
@@ -129,7 +139,7 @@ public class HeatmapDatabase {
      */
     private void createPlayerActivityTableIfNotExists() {
         try (Connection connection = dataSource.getConnection()) {
-            String Sql = "CREATE TABLE IF NOT EXISTS `player_activity` (`id` INT NOT NULL AUTO_INCREMENT ,"+
+            String Sql = "CREATE TABLE IF NOT EXISTS `"+getHeatmapPlayerActivityTableName()+"` (`id` INT NOT NULL AUTO_INCREMENT ,"+
                          " `player_name` VARCHAR(64) NOT NULL , `xpos` INT NOT NULL, `ypos` INT NOT NULL , `world_name` VARCHAR(64) NOT NULL ," +
                          " `activity_level` INT NOT NULL , `datetime` DATETIME NOT NULL, PRIMARY KEY (`id`)) ENGINE = InnoDB;";
             PreparedStatement statement = connection.prepareStatement(Sql);
@@ -206,7 +216,7 @@ public class HeatmapDatabase {
             // This does give a warning that sql injection may occur, but this is not true unless the developer creates a sql injection since the user has no control over the
             // from_datetime field
             PreparedStatement statement = connection.prepareStatement(
-                    "INSERT INTO `heatmap_layers`(`dyn_id`, `dyn_label`, `point_one_coords`, `point_two_coords`, `divisions`, `world_name`, `poll_range_seconds`, `fromToDate`) VALUES (?,?,?,?,?,?,?,?)");
+                    "INSERT INTO `"+getHeatmapLayerTableName()+"`(`dyn_id`, `dyn_label`, `point_one_coords`, `point_two_coords`, `divisions`, `world_name`, `poll_range_seconds`, `fromToDate`) VALUES (?,?,?,?,?,?,?,?)");
 
             statement.setString(1, layer.id);
             statement.setString(2, layer.label);
@@ -249,7 +259,7 @@ public class HeatmapDatabase {
         }
 
         try (Connection connection = dataSource.getConnection()) {
-            PreparedStatement statement = connection.prepareStatement("DELETE FROM `heatmap_layers` WHERE dyn_id = ? AND dyn_label = ?");
+            PreparedStatement statement = connection.prepareStatement("DELETE FROM `"+getHeatmapLayerTableName()+"` WHERE dyn_id = ? AND dyn_label = ?");
 
             statement.setString(1, name);
             statement.setString(2, name);
@@ -283,7 +293,7 @@ public class HeatmapDatabase {
 
         try (Connection connection = dataSource.getConnection()) {
             PreparedStatement statement = connection.prepareStatement(
-                    "INSERT INTO `player_activity`(`player_name`, `xpos`, `ypos`, `world_name`, `activity_level`, `datetime`) VALUES (?,?,?,?,?,'"+nowInstant+":00')");
+                    "INSERT INTO `"+getHeatmapPlayerActivityTableName()+"`(`player_name`, `xpos`, `ypos`, `world_name`, `activity_level`, `datetime`) VALUES (?,?,?,?,?,'"+nowInstant+":00')");
 
             statement.setString(1, playerName);
             statement.setInt(2, (int)location.x);
@@ -318,7 +328,7 @@ public class HeatmapDatabase {
         try (Connection connection = dataSource.getConnection()) {
             String dateString = HeatmapLayer.DateFormat.getDateAsString(HeatmapLayer.DateFormat.getDateNSecondsAgo(HeatmapLayer.DateFormat.nowDate(),layer.pollRangeSeconds));
             PreparedStatement statement = connection.prepareStatement(
-                    "SELECT `xpos`, `ypos`, `activity_level` from `player_activity` WHERE" +
+                    "SELECT `xpos`, `ypos`, `activity_level` from `"+getHeatmapPlayerActivityTableName()+"` WHERE" +
                         " xpos > ? AND xpos < ? AND ypos > ? AND ypos < ? AND datetime >= '"+dateString+"' AND world_name = ?;"
             );
 
@@ -359,7 +369,7 @@ public class HeatmapDatabase {
         try (Connection connection = dataSource.getConnection()) {
             String dateString = HeatmapLayer.DateFormat.getDateAsString(HeatmapLayer.DateFormat.getDateNSecondsAgo(HeatmapLayer.DateFormat.nowDate(),layer.pollRangeSeconds));
             PreparedStatement statement = connection.prepareStatement(
-                    "SELECT `xpos`, `ypos`, `activity_level` from `player_activity` WHERE" +
+                    "SELECT `xpos`, `ypos`, `activity_level` from `"+getHeatmapPlayerActivityTableName()+"` WHERE" +
                             " xpos > ? AND xpos < ? AND ypos > ? AND ypos < ? AND datetime >= '"+dateString+"' AND world_name = ?;"
             );
 
@@ -402,7 +412,7 @@ public class HeatmapDatabase {
             String f = fromDate.replace("\"","");
             String t = toDate.replace("\"","");
             PreparedStatement statement = connection.prepareStatement(
-                    "SELECT `xpos`, `ypos`, `activity_level` from `player_activity` WHERE" +
+                    "SELECT `xpos`, `ypos`, `activity_level` from `"+getHeatmapPlayerActivityTableName()+"` WHERE" +
                         " xpos > ? AND xpos < ? AND ypos > ? AND ypos < ? AND datetime >= '"+f+"' AND datetime <= '"+t+"' AND world_name = ?;"
             );
 
