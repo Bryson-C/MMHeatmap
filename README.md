@@ -132,8 +132,6 @@ For example "placeBlock" is worth 1 activity by default.
    - minecraft:overworld -- the world to add the data to
    - -2000 -2000 2000 2000 -- x1 y1 x2 y2
    - 5000 200 10000 -- data point count (how many data points to generate), minimum activity for a data point, maximum activity for a data point
-   - caveat:
-     - Currently fake data is generated and not automatically inserted to the database, only during polling periods. I can fix this, im just lazy
 
 
 ### "benchmark" Branch:

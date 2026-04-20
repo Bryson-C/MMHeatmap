@@ -712,17 +712,49 @@ public class HeatmapCommand {
                                     int x1 = IntegerArgumentType.getInteger(context, "x1"), x2 = IntegerArgumentType.getInteger(context, "x2");
                                     int y1 = IntegerArgumentType.getInteger(context, "y1"), y2 = IntegerArgumentType.getInteger(context, "y2");
 
+                                    String playerName = StringArgumentType.getString(context, "playername");
+                                    String worldName = context.getArgument("world", World.class).getName();
+
                                     long start = System.nanoTime();
-                                    PlayerActionListener.generateFakePlayerData(
-                                            StringArgumentType.getString(context, "playername"),
-                                            context.getArgument("world", World.class).getName(),
+                                    var data = PlayerActionListener.generateFakePlayerData(
+                                            playerName,
+                                            worldName,
                                             x1, y1, x2, y2,
                                             count,
                                             IntegerArgumentType.getInteger(context, "minactivity"),
                                             IntegerArgumentType.getInteger(context, "maxactivity")
                                     );
+
+                                    // Insert fake data into the database
+                                    for (var entry : data.entrySet()) {
+                                        String[] split = entry.getKey().split(";");
+
+                                        if (split.length < 2) {
+                                            // System.err.println("Failed Splitting Location Data; Skipping");
+                                            continue;
+                                        }
+
+                                        String[] chunkStr = split[1].split(",");
+                                        for (var nameInteractionPair : entry.getValue().entrySet()) {
+
+                                            int areaSize = PlayerActionListener.chunksSq * 16;
+                                            double x = Double.parseDouble(chunkStr[0]);
+                                            double y = Double.parseDouble(chunkStr[1]);
+
+                                            // Chunk to coords
+                                            int chunkX = (int)(x*areaSize) - (areaSize/-2);
+                                            int chunkY = (int)(y*areaSize) - (areaSize/-2);
+
+                                            Vector2d location = new Vector2d(chunkX, chunkY);
+
+                                            // upload all activity
+                                            database.insertPlayerActivity(playerName, worldName, location, nameInteractionPair.getValue());
+                                        }
+                                    }
+
+
                                     sender.sendRichMessage("<green>Done <blue>("+ Duration.ofNanos(System.nanoTime() - start).toMillis() +"ms)");
-                                    sender.sendRichMessage("<green>Changes will appear after next poll period");
+                                    sender.sendRichMessage("<green>Changes will appear after next poll period, or upon polling manually");
                                 };
 
                                 new Thread(r).start();

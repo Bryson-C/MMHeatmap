@@ -90,7 +90,10 @@ public class PlayerActionListener implements Listener {
 
     /**
      * Generates fake player activity for testing the heatmap
-     * Note: Data is not returned, to insert data to the database, you should poll the map
+     * Note: Data is not returned, to insert data to the database.
+     * Another Note: because of the nature of the command, using a larger count may override older iterations of the internal loop,
+     *               On the other hand, this is expected for random results -- this will be less of an issue with lower a count,
+     *               or a larger surface area
      *
      * @param playerName The playername you want to insert the data under, should be unique compared to normal player names
      * @param world The world to add the data to, generally the world you are in
@@ -101,27 +104,32 @@ public class PlayerActionListener implements Listener {
      * @param count How many data points to generate
      * @param minActivity minimum amount of activity that can be added for any data point
      * @param maxActivity maximum amount of activity that can be added for any data point
+     * @return Returns a map of key ["world;x;y"] and sub key ["playerName"] and value of PlayerChunkInteractions
      */
-    public static void generateFakePlayerData(String playerName, String world, int x1, int y1, int x2, int y2, int count, int minActivity, int maxActivity) {
+    public static Map<String, Map<String, PlayerChunkInteractions>> generateFakePlayerData(String playerName, String world, int x1, int y1, int x2, int y2, int count, int minActivity, int maxActivity) {
         Random r = new Random();
 
         int chunkX1 = x1/16, chunkX2 = x2/16;
         int chunkY1 = y1/16, chunkY2 = y2/16;
 
+        Map<String, Map<String, PlayerChunkInteractions>> map = new HashMap<>();
+
         for (int i = 0; i < count; i++) {
             String key = String.format("%s;%d,%d", world, r.nextInt(chunkX1, chunkX2), r.nextInt(chunkY1, chunkY2));
 
-            if (!playerActions.containsKey(key)) {
-                playerActions.put(key, new HashMap<>());
+            if (!map.containsKey(key)) {
+                map.put(key, new HashMap<>());
             }
-            Map<String, PlayerChunkInteractions> map = playerActions.get(key);
-            if (!map.containsKey(playerName)) {
-                map.put(playerName, new PlayerChunkInteractions(config));
+            Map<String, PlayerChunkInteractions> m = map.get(key);
+            if (!m.containsKey(playerName)) {
+                m.put(playerName, new PlayerChunkInteractions(config));
             }
-            PlayerChunkInteractions actions = map.get(playerName);
 
+            PlayerChunkInteractions actions = m.get(playerName);
             actions.activity = r.nextInt(maxActivity-minActivity)+minActivity;
         }
+
+        return map;
     }
 
     /**
