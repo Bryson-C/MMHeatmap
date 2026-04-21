@@ -13,7 +13,10 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.*;
+import org.bukkit.inventory.Inventory;
 import org.dynmap.markers.PlayerSet;
 
 import java.io.RandomAccessFile;
@@ -56,6 +59,8 @@ public class PlayerActionListener implements Listener {
     static public double playerShearBlockEventWeight;
     static public double playerShearEntityEventWeight;
     static public double playerTakeLecternBookEventWeight;
+    static public double playerInteractChestWeight;
+    static public double playerInteractBarrelWeight;
 
     /**
      * Reads the config file for action weights and saves them in variables so that the file is not reading from disk frequently
@@ -81,6 +86,8 @@ public class PlayerActionListener implements Listener {
         PlayerActionListener.playerShearBlockEventWeight = config.getDouble("activityWeights.playerShearBlockEvent");
         PlayerActionListener.playerShearEntityEventWeight = config.getDouble("activityWeights.playerShearEntityEvent");
         PlayerActionListener.playerTakeLecternBookEventWeight = config.getDouble("activityWeights.playerTakeLecternBookEvent");
+        PlayerActionListener.playerInteractChestWeight = config.getDouble("activityWeights.playerInteractChestEvent");
+        PlayerActionListener.playerInteractBarrelWeight = config.getDouble("activityWeights.playerInteractBarrelEvent");
         PlayerActionListener.config = config;
     }
 
@@ -155,6 +162,15 @@ public class PlayerActionListener implements Listener {
     }
 
     // The following are all event listeners with weights: I will not be documenting them all
+
+    @EventHandler(priority = EventPriority.NORMAL)
+    public static void onPlayerPlace(InventoryOpenEvent event) {
+        PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), (Player)event.getPlayer());
+        if (event.getInventory().getType() == InventoryType.CHEST)
+            actions.activity += playerInteractChestWeight;
+        if (event.getInventory().getType() == InventoryType.BARREL)
+            actions.activity += playerInteractBarrelWeight;
+    }
 
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerPlace(BlockPlaceEvent event) {

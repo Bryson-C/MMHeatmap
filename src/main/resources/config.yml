@@ -52,3 +52,5 @@ activityWeights:
   playerShearBlockEvent: 1
   playerShearEntityEvent: 0
   playerTakeLecternBookEvent: 0
+  playerInteractChestEvent: 1
+  playerInteractBarrelEvent: 1
