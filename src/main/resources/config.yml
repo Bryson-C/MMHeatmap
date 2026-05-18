@@ -1,7 +1,4 @@
 database:
-  address: 'jdbc:mysql://address:port/database'
-  username: 'username'
-  password: 'password'
   serverTablePrefix: 'mainserver'
 
 defaults:
@@ -10,6 +7,8 @@ defaults:
   # will log the amount of time taken to poll the heatmap to the command/function caller
   # (i.e. if a player called the poll function, they will receive the message, otherwise the console)
   logPollTime: true
+  # changing this to above 1 may cause issues, and can create backwards compatibility issues because of how the data is polled
+  # leaving this at 1 should not cause memory issues, and creates the most accurate data for the database
   pollAreaChunkSize: 1
   # if the poll range in seconds for a layer is set to this value, it will never update (after being created)
   # make sure this will never occur in practice by accident
@@ -28,13 +27,18 @@ colors:
   cellOpacity: 0.50
   borderColor: '#E0E0E0'
   borderOpacity: 0.70
+  # unused options, but may be implemented later
   heatmapBaseLayerColor: '#0F7299'
   heatmapBaseLayerOpacity: 0.05
 
 # to disable, enter 0, otherwise, the weight will be added per action
 activityWeights:
+  # What to clamp activity to, this prevents people from flooding activity in the heatmap (for example: by instant mining large areas)
+  # Since I prefer smaller values, I choose 20 by default
+  maxActivityPerPoll: 20
   # The minimum amount of activity for activity to be added to the database
   minimumActivityForRecording: 5
+  # Customizable Weights Per Actions
   playerPlace: 1
   playerBreak: 1
   playerSetSpawn: 1.5

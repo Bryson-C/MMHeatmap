@@ -22,7 +22,6 @@ import java.util.logging.Logger;
  */
 public class DynWrapper {
     private static DynmapCommonAPI api;
-    private static FileConfiguration config;
     private static ArrayList<Color> colors;
     private static Logger logger;
 
@@ -30,27 +29,32 @@ public class DynWrapper {
      * Constructor setting the Dynmap Api to a given api and config variable to be used within the entire class
      *
      * @param api The Dynmap Api object to be saved within the class for later method calls
-     * @param config The plugin config which controls much of the design of heatmap cells
+     * @param logger The plugin's logger to not flood the standard out
      */
-    public DynWrapper(DynmapCommonAPI api, FileConfiguration config, Logger logger) {
+    public DynWrapper(DynmapCommonAPI api, Logger logger) {
         DynWrapper.api = api;
-        DynWrapper.config = config;
-        DynWrapper.colors = createColorArray(config);
+        DynWrapper.colors = createColorArray();
         DynWrapper.logger = logger;
     }
 
     /**
-     * Creates a list of colors based on the config given, or defaults to red
+     * Changes the dynmap wrapper's config settings to the plugin's config
+     */
+    public static void applyConfig() {
+        DynWrapper.colors = createColorArray();
+    }
+
+    /**
+     * Creates a list of colors based on the config, or defaults to red
      *
-     * @param config The config to be read from to get colors
      * @return Returns either:
      *          1. A list of colors,
      *          2. A list of a color and a duplicate color (if only 1 color is set in the config)
      *          3. If the other options fail, default to an array of 2 red colors
      */
-    private ArrayList<Color> createColorArray(FileConfiguration config) {
+    private static ArrayList<Color> createColorArray() {
         ArrayList<Color> colors = new ArrayList<>();
-        String colorConfig = config.getString("colors.cellActivityGradient");
+        String colorConfig = HeatmapConfig.getCellActivityGradient();
         // this will make sure that if the colorConfig can not be gotten, the process will continue, and be handled
         // by the default case down in "if (colors.isEmpty())..."
         if (colorConfig == null) { colorConfig = ""; }
@@ -347,23 +351,33 @@ public class DynWrapper {
             // Math from: https://computergraphics.stackexchange.com/questions/3801/how-can-you-interpolate-over-an-array-of-say-5-colors
             // and: https://math.stackexchange.com/questions/754130/find-what-percent-x-is-between-two-numbers
 
-            // get percentage between minActivity to maxActivity
-            int activity = kv.getValue();
-            double percentage = (activity - minActivity)/(double)(maxActivity - minActivity);
+            // NOTE: when only 1 cell exists
 
-            // get the 2 colors in the array to interpolate between
-            int t1 = Math.clamp((int)Math.floor(percentage * colors.size()), 0, colors.size()-1);
-            int t2 = Math.clamp((int)Math.ceil(percentage * colors.size()), 0, colors.size()-1);
+            Color c;
+            // here we need a special case for only 1 cell of total activity. When only 1 cell exists the cell is black because it evaluates to 0???? and multiplying a color by 0 means black in rgb
+            // while the chances of this happening is incredibly low, it's still something I don't like the look of so it should be fixed
+            if (deDuplicateMap.size() <= 1) {
+                // percentage should simply evaluate to 100% because 1/1 equals 100%
+                c = colors.getLast();
+            } else {
 
-            // get the amount of color to apply
-            double amount = percentage-(t1/(double)colors.size());
-            Color c = lerpRGB(colors.get(t1), colors.get(t2), amount);
+                // get percentage between minActivity to maxActivity
+                int activity = kv.getValue();
+                double percentage = (activity - minActivity)/(double)(maxActivity - minActivity);
 
+                // get the 2 colors in the array to interpolate between
+                int t1 = Math.clamp((int)Math.floor(percentage * colors.size()), 0, colors.size()-1);
+                int t2 = Math.clamp((int)Math.ceil(percentage * colors.size()), 0, colors.size()-1);
+
+                // get the amount of color to apply
+                double amount = percentage-(t1/(double)colors.size());
+                c = lerpRGB(colors.get(t1), colors.get(t2), amount);
+            }
             // finally, set the color
             // marker may be null if the area already exists under the dynmap id
             if (marker != null) {
-                marker.setFillStyle(config.getDouble("colors.cellOpacity"), colorToInteger(c));
-                marker.setLineStyle(1, config.getDouble("colors.borderOpacity"), colorToInteger(hexToColor(config.getString("colors.borderColor"))));
+                marker.setFillStyle(HeatmapConfig.getCellOpacity(), colorToInteger(c));
+                marker.setLineStyle(1, HeatmapConfig.getBorderOpacity(), colorToInteger(hexToColor(HeatmapConfig.getBorderColor())));
                 marker.setDescription("Activity: " + kv.getValue());
             } else {
                 logger.warning("Error styling area marker, marker is null");
@@ -453,8 +467,8 @@ public class DynWrapper {
             // finally, set the color
             // marker may be null if the area already exists under the dynmap id
             if (marker != null) {
-                marker.setFillStyle(config.getDouble("colors.cellOpacity"), colorToInteger(c));
-                marker.setLineStyle(1, config.getDouble("colors.borderOpacity"), colorToInteger(hexToColor(config.getString("colors.borderColor"))));
+                marker.setFillStyle(HeatmapConfig.getCellOpacity(), colorToInteger(c));
+                marker.setLineStyle(1, HeatmapConfig.getBorderOpacity(), colorToInteger(hexToColor(HeatmapConfig.getBorderColor())));
                 marker.setDescription("Cell ("+index[0]+", "+index[1]+") Activity: " + kv.getValue());
             } else {
                 logger.warning("Error styling area marker, marker is null");

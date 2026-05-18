@@ -3,6 +3,7 @@ package org.bc.MMheatmap.poller;
 import io.papermc.paper.util.Tick;
 import net.kyori.adventure.text.Component;
 import org.bc.MMheatmap.HeatmapCommand;
+import org.bc.MMheatmap.HeatmapConfig;
 import org.bc.MMheatmap.HeatmapDatabase;
 import org.bc.MMheatmap.HeatmapLayer;
 import org.bukkit.Server;
@@ -44,16 +45,15 @@ public class PlayerActivityPoller {
      * @param plugin The Bukkit plugin object
      * @param server The server object
      * @param database The HeatmapDatabase object
-     * @param config The config file to set defaults about the poller
      *
      * @see HeatmapDatabase
      */
-    public PlayerActivityPoller(Plugin plugin, Server server, HeatmapDatabase database, FileConfiguration config) {
+    public PlayerActivityPoller(Plugin plugin, Server server, HeatmapDatabase database) {
         if (instance != null) return;
 
         PlayerActivityPoller.instance = this;
         PlayerActivityPoller.database = database;
-        PlayerActivityPoller.pollFrequencySeconds = config.getInt("defaults.pollFrequencySeconds");
+        PlayerActivityPoller.pollFrequencySeconds = HeatmapConfig.getPollFrequencySeconds();
 
         // This is not called asyncronously because it will need to access other data, for thread safety, I will live this synchronized (for now)
         server.getScheduler().runTaskTimerAsynchronously(plugin, /* Lambda: */ task -> {
@@ -92,7 +92,7 @@ public class PlayerActivityPoller {
                 }
             }
             activelyPolledLayers = 0;
-            int dontPollSeconds = config.getInt("defaults.noUpdatePollRangeSeconds");
+            int dontPollSeconds = HeatmapConfig.getNoUpdatePoolRangeSeconds();
             for (HeatmapLayer layer : database.getHeatmapLayers().values()) {
                 // If a layer is set to not be polled, skip over it
                 if (layer.getPollRangeSeconds() == dontPollSeconds) continue;
@@ -106,6 +106,6 @@ public class PlayerActivityPoller {
 
         } /* End of the lambda */, 0, Tick.tick().fromDuration(Duration.ofSeconds(pollFrequencySeconds)));
 
-        server.getPluginManager().registerEvents(new PlayerActionListener(config), plugin);
+        server.getPluginManager().registerEvents(new PlayerActionListener(), plugin);
     }
 }

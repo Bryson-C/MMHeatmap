@@ -133,6 +133,9 @@ For example "placeBlock" is worth 1 activity by default.
    - -2000 -2000 2000 2000 -- x1 y1 x2 y2
    - 5000 200 10000 -- data point count (how many data points to generate), minimum activity for a data point, maximum activity for a data point
 
+### "reloadConfig" Branch:
+ - this is as simple as: /mmheatmap reloadConfig, it will simply re-read the config file and try to apply changes becuase of the nature of some of the config options (specifically colors) it is considered an expensive operation. 
+   With that being said, the map will repoll all layers to try and fix color changes in the config. This is done on a seperate thread, so it should not be too much to worry about, but there is no immidiate feedback.
 
 ### "benchmark" Branch:
 - TODO: Implement
@@ -174,6 +177,8 @@ For example "placeBlock" is worth 1 activity by default.
   - mmheatmap.resync
 - /mmheatmap generateFakePlayerData ...
   - mmheatmap.generateFakeData
+- /mmheatmap reloadConfig
+  - mmheatmap.reloadconfig
 - /mmheatmap benchmark
   - TODO: Implement
 - /mmheatmap ...

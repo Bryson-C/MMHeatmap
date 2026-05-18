@@ -30,13 +30,12 @@ import java.util.logging.Logger;
 public class HeatmapDatabase {
     private static HikariDataSource dataSource;
     private static Logger logger;
-    private static FileConfiguration config;
 
     public static String getHeatmapLayerTableName() {
-        return String.format("%s_%s",config.getString("database.serverTablePrefix"),"heatmap_layers");
+        return String.format("%s_%s", HeatmapConfig.Database.serverTablePrefix, "heatmap_layers");
     }
     public static String getHeatmapPlayerActivityTableName() {
-        return String.format("%s_%s",config.getString("database.serverTablePrefix"),"player_activity");
+        return String.format("%s_%s", HeatmapConfig.Database.serverTablePrefix, "player_activity");
     }
 
     // try to keep this up to date with each deletion and insertion of the database,
@@ -49,19 +48,17 @@ public class HeatmapDatabase {
      *
      * Implementation From: https://docs.papermc.io/paper/dev/using-databases/
      *
-     * @param configFile The plugins config file containing database info
+     * @param logger The plugin's logger to send information to
      *
      * @see HeatmapDatabase
      */
-    public HeatmapDatabase(FileConfiguration configFile, Logger logger) {
+    public HeatmapDatabase(Logger logger) {
         HikariConfig config = new HikariConfig();
-        config.setJdbcUrl(configFile.getString("database.address")); // Address of your running MySQL database
-        config.setUsername(configFile.getString("database.username")); // Username
-        config.setPassword(configFile.getString("database.password")); // Password
+        config.setJdbcUrl(HeatmapConfig.Database.address); // Address of your running MySQL database
+        config.setUsername(HeatmapConfig.Database.username); // Username
+        config.setPassword(HeatmapConfig.Database.password); // Password
         config.setMaximumPoolSize(10); // Pool size defaults to 10
         config.addDataSourceProperty("", ""); // MISC settings to add
-
-        HeatmapDatabase.config = configFile;
 
         dataSource = new HikariDataSource(config);
         resyncHeatmapDatabase();
@@ -290,6 +287,9 @@ public class HeatmapDatabase {
         // Retrieved 2026-03-29, License - CC BY-SA 3.0
         DateTimeFormatter dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
         String nowInstant = LocalDateTime.now().format(dateFormat);
+
+        int activityLevel = activity.calculateActivityLevel();
+        if (activityLevel < HeatmapConfig.getMinimumActivityForRecording()) return;
 
         try (Connection connection = dataSource.getConnection()) {
             PreparedStatement statement = connection.prepareStatement(

@@ -3,6 +3,7 @@ package org.bc.MMheatmap.poller;
 import com.destroystokyo.paper.event.player.PlayerSetSpawnEvent;
 import io.papermc.paper.event.block.PlayerShearBlockEvent;
 import io.papermc.paper.event.player.*;
+import org.bc.MMheatmap.HeatmapConfig;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -39,56 +40,15 @@ import java.util.Random;
  */
 public class PlayerActionListener implements Listener {
 
-    static FileConfiguration config;
     // The area to record over, so for instance, 1 means 1x1 chunks, 3 would mean a 3x3 chunk area
     static public int chunksSq;
-    static public double playerPlaceWeight;
-    static public double playerBreakWeight;
-    static public double playerSetSpawnWeight;
-    static public double playerBedEnterWeight;
-    static public double playerLeaveBedWeight;
-    static public double playerChangeBeaconEffectWeight;
-    static public double playerChangedWorldEventWeight;
-    static public double playerFishEventWeight;
-    static public double playerFlowerPotManipulateEventWeight;
-    static public double playerArmorStandManipulateEventWeight;
-    static public double playerHarvestBlockEventWeight;
-    static public double playerInsertLecternEventWeight;
-    static public double playerItemFrameChangeEventWeight;
-    static public double playerPurchaseEventWeight;
-    static public double playerShearBlockEventWeight;
-    static public double playerShearEntityEventWeight;
-    static public double playerTakeLecternBookEventWeight;
-    static public double playerInteractChestWeight;
-    static public double playerInteractBarrelWeight;
 
     /**
      * Reads the config file for action weights and saves them in variables so that the file is not reading from disk frequently
-     * @param config The config file with the action weights inside
      */
-    PlayerActionListener(FileConfiguration config) {
+    PlayerActionListener() {
         // load weights so we aren't reading from files constantly
-        PlayerActionListener.chunksSq = config.getInt("defaults.pollAreaChunkSize");
-        PlayerActionListener.playerPlaceWeight = config.getDouble("activityWeights.playerPlace");
-        PlayerActionListener.playerBreakWeight = config.getDouble("activityWeights.playerBreak");
-        PlayerActionListener.playerSetSpawnWeight = config.getDouble("activityWeights.playerSetSpawn");
-        PlayerActionListener.playerBedEnterWeight = config.getDouble("activityWeights.playerBedEnter");
-        PlayerActionListener.playerLeaveBedWeight = config.getDouble("activityWeights.playerLeaveBed");
-        PlayerActionListener.playerChangeBeaconEffectWeight = config.getDouble("activityWeights.playerChangeBeaconEffect");
-        PlayerActionListener.playerChangedWorldEventWeight = config.getDouble("activityWeights.playerChangedWorldEvent");
-        PlayerActionListener.playerFishEventWeight = config.getDouble("activityWeights.playerFishEvent");
-        PlayerActionListener.playerFlowerPotManipulateEventWeight = config.getDouble("activityWeights.playerFlowerPotManipulateEvent");
-        PlayerActionListener.playerArmorStandManipulateEventWeight = config.getDouble("activityWeights.playerArmorStandManipulateEvent");
-        PlayerActionListener.playerHarvestBlockEventWeight = config.getDouble("activityWeights.playerHarvestBlockEvent");
-        PlayerActionListener.playerInsertLecternEventWeight = config.getDouble("activityWeights.playerInsertLecternEvent");
-        PlayerActionListener.playerItemFrameChangeEventWeight = config.getDouble("activityWeights.playerItemFrameChangeEvent");
-        PlayerActionListener.playerPurchaseEventWeight = config.getDouble("activityWeights.playerPurchaseEvent");
-        PlayerActionListener.playerShearBlockEventWeight = config.getDouble("activityWeights.playerShearBlockEvent");
-        PlayerActionListener.playerShearEntityEventWeight = config.getDouble("activityWeights.playerShearEntityEvent");
-        PlayerActionListener.playerTakeLecternBookEventWeight = config.getDouble("activityWeights.playerTakeLecternBookEvent");
-        PlayerActionListener.playerInteractChestWeight = config.getDouble("activityWeights.playerInteractChestEvent");
-        PlayerActionListener.playerInteractBarrelWeight = config.getDouble("activityWeights.playerInteractBarrelEvent");
-        PlayerActionListener.config = config;
+        PlayerActionListener.chunksSq = HeatmapConfig.getPollAreaChunkSize();
     }
 
     // Optimize memory, or make sure that memory doesn't get to insane
@@ -129,7 +89,7 @@ public class PlayerActionListener implements Listener {
             }
             Map<String, PlayerChunkInteractions> m = map.get(key);
             if (!m.containsKey(playerName)) {
-                m.put(playerName, new PlayerChunkInteractions(config));
+                m.put(playerName, new PlayerChunkInteractions());
             }
 
             PlayerChunkInteractions actions = m.get(playerName);
@@ -154,7 +114,7 @@ public class PlayerActionListener implements Listener {
         }
         Map<String, PlayerChunkInteractions> map = playerActions.get(key);
         if (!map.containsKey(player.getName())) {
-            map.put(player.getName(), new PlayerChunkInteractions(config));
+            map.put(player.getName(), new PlayerChunkInteractions());
         }
 
         PlayerChunkInteractions actions = map.get(player.getName());
@@ -167,97 +127,97 @@ public class PlayerActionListener implements Listener {
     public static void onPlayerPlace(InventoryOpenEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), (Player)event.getPlayer());
         if (event.getInventory().getType() == InventoryType.CHEST)
-            actions.activity += playerInteractChestWeight;
+            actions.activity += HeatmapConfig.ActionWeights.interactChest;
         if (event.getInventory().getType() == InventoryType.BARREL)
-            actions.activity += playerInteractBarrelWeight;
+            actions.activity += HeatmapConfig.ActionWeights.interactBarrel;
     }
 
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerPlace(BlockPlaceEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
-        actions.activity += playerPlaceWeight;
+        actions.activity += HeatmapConfig.ActionWeights.placeBlock;
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerBreak(BlockBreakEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getBlock().getChunk(), event.getPlayer());
-        actions.activity += playerBreakWeight;
+        actions.activity += HeatmapConfig.ActionWeights.breakBlock;
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerSetSpawn(PlayerSetSpawnEvent event) {
         Location loc = event.getLocation();
         if (loc == null) return;
         PlayerChunkInteractions actions = getPlayerChunkInteractions(loc.getChunk(), event.getPlayer());
-        actions.activity += playerSetSpawnWeight;
+        actions.activity += HeatmapConfig.ActionWeights.setSpawn;
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerBedEnter(PlayerBedEnterEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getBed().getLocation().getChunk(), event.getPlayer());
-        actions.activity += playerBedEnterWeight;
+        actions.activity += HeatmapConfig.ActionWeights.bedEnter;
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerLeaveBed(PlayerBedLeaveEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getBed().getLocation().getChunk(), event.getPlayer());
-        actions.activity += playerLeaveBedWeight;
+        actions.activity += HeatmapConfig.ActionWeights.leaveBed;
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerChangeBeaconEffect(PlayerChangeBeaconEffectEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getBeacon().getLocation().getChunk(), event.getPlayer());
-        actions.activity += playerChangeBeaconEffectWeight;
+        actions.activity += HeatmapConfig.ActionWeights.changeBeaconEffect;
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerChangedWorldEvent(PlayerChangedWorldEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
-        actions.activity += playerChangedWorldEventWeight;
+        actions.activity += HeatmapConfig.ActionWeights.changedWorldEvent;
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerFishEvent(PlayerFishEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
-        actions.activity += playerFishEventWeight;
+        actions.activity += HeatmapConfig.ActionWeights.fishEvent;
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerFlowerPotManipulateEvent(PlayerFlowerPotManipulateEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
-        actions.activity += playerFlowerPotManipulateEventWeight;
+        actions.activity += HeatmapConfig.ActionWeights.flowerPotManipulateEvent;
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerArmorStandManipulateEvent(PlayerArmorStandManipulateEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
-        actions.activity += playerArmorStandManipulateEventWeight;
+        actions.activity += HeatmapConfig.ActionWeights.armorStandManipulateEvent;
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerHarvestBlockEvent(PlayerHarvestBlockEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
-        actions.activity += playerHarvestBlockEventWeight;
+        actions.activity += HeatmapConfig.ActionWeights.harvestBlockEvent;
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerInsertLecternEvent(PlayerInsertLecternBookEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getBlock().getChunk(), event.getPlayer());
-        actions.activity += playerInsertLecternEventWeight;
+        actions.activity += HeatmapConfig.ActionWeights.insertLecternEvent;
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerItemFrameChangeEvent(PlayerItemFrameChangeEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
-        actions.activity += playerItemFrameChangeEventWeight;
+        actions.activity += HeatmapConfig.ActionWeights.itemFrameChangeEvent;
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerPurchaseEvent(PlayerPurchaseEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
-        actions.activity += playerPurchaseEventWeight;
+        actions.activity += HeatmapConfig.ActionWeights.purchaseEvent;
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerShearBlockEvent(PlayerShearBlockEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getBlock().getChunk(), event.getPlayer());
-        actions.activity += playerShearBlockEventWeight;
+        actions.activity += HeatmapConfig.ActionWeights.shearBlockEvent;
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerShearEntityEvent(PlayerShearEntityEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
-        actions.activity += playerShearEntityEventWeight;
+        actions.activity += HeatmapConfig.ActionWeights.shearEntityEvent;
     }
     @EventHandler(priority = EventPriority.NORMAL)
     public static void onPlayerTakeLecternBookEvent(PlayerTakeLecternBookEvent event) {
         PlayerChunkInteractions actions = getPlayerChunkInteractions(event.getPlayer().getChunk(), event.getPlayer());
-        actions.activity += playerTakeLecternBookEventWeight;
+        actions.activity += HeatmapConfig.ActionWeights.takeLecternBookEvent;
     }
 
     /**

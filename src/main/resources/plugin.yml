@@ -1,7 +1,7 @@
 name: MMheatmap
-version: '1.0-SNAPSHOT'
+version: '1.0'
 main: org.bc.MMheatmap.MMheatmap
-api-version: '1.21'
+api-version: '1.21.11'
 authors: [ BC/Exo ]
 depend:
   - dynmap

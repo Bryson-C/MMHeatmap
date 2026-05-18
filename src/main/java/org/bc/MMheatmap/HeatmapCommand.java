@@ -16,6 +16,8 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.dynmap.markers.MarkerSet;
 import org.joml.Vector2d;
 
@@ -36,18 +38,18 @@ import java.util.regex.Pattern;
 public class HeatmapCommand {
     private static LiteralCommandNode<CommandSourceStack> builtCommand;
     private static HeatmapDatabase database;
-    private static FileConfiguration config;
+    // this is used to get the latest config when a reload is requested
+    private static JavaPlugin plugin;
 
     /**
      * Builds the full "/mmheatmap" command tree and initializes the Dynmap API and Database for the rest of the class to use.
      *
      * The code is going to be very horizontal as a result of chaining many many features on a command builder, so Im using 1 line per command feature
      */
-    public HeatmapCommand(HeatmapDatabase database, FileConfiguration config) {
+    public HeatmapCommand(HeatmapDatabase database, JavaPlugin plugin) {
         // Sets a database object to be used within some commands
         HeatmapCommand.database = database;
-        // Sets the config file from the plugin to be used in the commands
-        HeatmapCommand.config = config;
+        HeatmapCommand.plugin = plugin;
 
         // Command root
         LiteralArgumentBuilder<CommandSourceStack> commandRoot = Commands.literal("mmheatmap");
@@ -88,7 +90,7 @@ public class HeatmapCommand {
                                 sender.sendRichMessage("<b>World: <reset><green>" + layer.world);
                                 sender.sendRichMessage("<b>Range: <reset><green>" + String.format("[%.0f, %.0f] -> [%.0f, %.0f]", layer.topLeft.x, layer.topLeft.y, layer.bottomRight.x, layer.bottomRight.y));
                                 sender.sendRichMessage("<b>Divisions: <reset><green>" + layer.divisions);
-                                if (layer.pollRangeSeconds == config.getInt("defaults.noUpdatePollRangeSeconds")) {
+                                if (layer.pollRangeSeconds == HeatmapConfig.getNoUpdatePoolRangeSeconds()) {
                                     String dateString = database.executeSql((connection) -> {
                                         try {
                                             PreparedStatement stmt = connection.prepareStatement("SELECT `fromToDate` FROM `"+HeatmapDatabase.getHeatmapLayerTableName()+"` WHERE `dyn_id` = ? AND `dyn_label` = ?");
@@ -148,7 +150,7 @@ public class HeatmapCommand {
                                             new Vector2d(IntegerArgumentType.getInteger(context, "x1"), IntegerArgumentType.getInteger(context, "y1")),
                                             new Vector2d(IntegerArgumentType.getInteger(context, "x2"), IntegerArgumentType.getInteger(context, "y2")),
                                             IntegerArgumentType.getInteger(context, "divisioncountsq"),
-                                            config.getInt("defaults.pollRangeSeconds"),
+                                            HeatmapConfig.getPollRangeSeconds(),
                                             world.getName(),
                                             "", ""
                                     );
@@ -162,6 +164,7 @@ public class HeatmapCommand {
                         )
                         // custom time period branch
                         .then(Commands.argument("relativetimeperiod", StringArgumentType.string())
+                            .suggests((ctx, builder) -> { builder.suggest("\"1w\""); builder.suggest("\"1d\""); builder.suggest("\"1h\""); builder.suggest("\"1m\""); builder.suggest("\"1s\""); return builder.buildFuture(); })
                             .then(Commands.argument("world", ArgumentTypes.world())
                                 .requires(sender -> sender.getSender().hasPermission("mmheatmap.divideWorld"))
                                 .executes(context -> {
@@ -214,7 +217,9 @@ public class HeatmapCommand {
                 .then(Commands.argument("x1", IntegerArgumentType.integer()).then(Commands.argument("y1", IntegerArgumentType.integer()).then(Commands.argument("x2", IntegerArgumentType.integer()).then(Commands.argument("y2", IntegerArgumentType.integer())
                     .then(Commands.argument("divisioncountsq", IntegerArgumentType.integer(1))
                         .then(Commands.argument("startdate", StringArgumentType.string())
+                        .suggests((ctx, builder) -> { builder.suggest("\"yyyy-mm-dd hh:mm:ss\""); return builder.buildFuture(); })
                             .then(Commands.argument("enddate", StringArgumentType.string())
+                            .suggests((ctx, builder) -> { builder.suggest("\"yyyy-mm-dd hh:mm:ss\""); return builder.buildFuture(); })
                                 .then(Commands.argument("world", ArgumentTypes.world())
                                     .requires(sender -> sender.getSender().hasPermission("mmheatmap.divideWorld"))
                                     .executes(context -> {
@@ -298,7 +303,9 @@ public class HeatmapCommand {
                             .then(Commands.literal("dateRange")
                                 // specific date branch
                                 .then(Commands.argument("startdate", StringArgumentType.string())
+                                .suggests((ctx, builder) -> { builder.suggest("\"yyyy-mm-dd hh:mm:ss\""); return builder.buildFuture(); })
                                     .then(Commands.argument("enddate", StringArgumentType.string())
+                                    .suggests((ctx, builder) -> { builder.suggest("\"yyyy-mm-dd hh:mm:ss\""); return builder.buildFuture(); })
                                         .requires(sender -> sender.getSender().hasPermission("mmheatmap.delete.playerActivity"))
                                         .executes(context -> {
                                             CommandSender sender = context.getSource().getSender();
@@ -327,6 +334,7 @@ public class HeatmapCommand {
                             // relative range branch
                             .then(Commands.literal("relativeTimePeriod")
                                 .then(Commands.argument("relativetimerange", StringArgumentType.string())
+                                .suggests((ctx, builder) -> { builder.suggest("\"1w\""); builder.suggest("\"1d\""); builder.suggest("\"1h\""); builder.suggest("\"1m\""); builder.suggest("\"1s\""); return builder.buildFuture(); })
 
                                     .requires(sender -> sender.getSender().hasPermission("mmheatmap.delete.playerActivity"))
                                     .executes(context -> {
@@ -456,7 +464,7 @@ public class HeatmapCommand {
                                 HeatmapLayer layer = database.getHeatmapLayers().get(layerName);
 
                                 // this branch needs to be handled differently because of the nature of not updating
-                                if (layer.getPollRangeSeconds() == config.getInt("defaults.noUpdatePollRangeSeconds")) {
+                                if (layer.getPollRangeSeconds() == HeatmapConfig.getNoUpdatePoolRangeSeconds()) {
                                     sender.sendRichMessage("<yellow>Heatmap layer is set not to update. Manual date re-entry will be required");
                                     return;
                                 }
@@ -508,7 +516,9 @@ public class HeatmapCommand {
                 )
                 .then(Commands.literal("dateRange")
                     .then(Commands.argument("startdate", StringArgumentType.string())
+                    .suggests((ctx, builder) -> { builder.suggest("\"yyyy-mm-dd hh:mm:ss\""); return builder.buildFuture(); })
                         .then(Commands.argument("enddate", StringArgumentType.string())
+                        .suggests((ctx, builder) -> { builder.suggest("\"yyyy-mm-dd hh:mm:ss\""); return builder.buildFuture(); })
                             .requires(sender -> sender.getSender().hasPermission("mmheatmap.modify.dateRange"))
                             .executes(context -> {
                                 Runnable r = () -> {
@@ -529,7 +539,7 @@ public class HeatmapCommand {
 
                                     HeatmapLayer layer = database.getHeatmapLayers().get(layerName);
 
-                                    if (layer.pollRangeSeconds != config.getInt("defaults.noUpdatePollRangeSeconds")) {
+                                    if (layer.pollRangeSeconds != HeatmapConfig.getNoUpdatePoolRangeSeconds()) {
                                         sender.sendRichMessage("<red>dateRange modification setting is only to be used for non-updating maps, try \"/... modify relativetimeperiod\"");
                                         return;
                                     }
@@ -561,6 +571,7 @@ public class HeatmapCommand {
                 )
                 .then(Commands.literal("relativeTimePeriod")
                     .then(Commands.argument("relativetimeperiod", StringArgumentType.string())
+                    .suggests((ctx, builder) -> { builder.suggest("\"1w\""); builder.suggest("\"1d\""); builder.suggest("\"1h\""); builder.suggest("\"1m\""); builder.suggest("\"1s\""); return builder.buildFuture(); })
                         .requires(sender -> sender.getSender().hasPermission("mmheatmap.modify.relativeTimePeriod"))
                         .executes(context -> {
 
@@ -570,7 +581,7 @@ public class HeatmapCommand {
                                 HeatmapLayer layer = database.getHeatmapLayers().get(layerName);
 
 
-                                if (layer.pollRangeSeconds == config.getInt("defaults.noUpdatePollRangeSeconds")) {
+                                if (layer.pollRangeSeconds == HeatmapConfig.getNoUpdatePoolRangeSeconds()) {
                                     sender.sendRichMessage("<red>relativetimeperiod modification setting is only to be used for updating maps, try \"/... modify dateRange\"");
                                     return;
                                 }
@@ -783,7 +794,58 @@ public class HeatmapCommand {
                     return Command.SINGLE_SUCCESS;
                 });
 
+        LiteralArgumentBuilder<CommandSourceStack> reloadConfig = Commands.literal("reloadConfig")
+            .requires(sender -> sender.getSender().hasPermission("mmheatmap.reloadconfig"))
+            .executes(context -> {
+                // pause polling, this function should manually re-poll all layers in case of color/display changes
+                PlayerActivityPoller.pausePolling();
+                HeatmapConfig.reload();
+                DynWrapper.applyConfig();
+                CommandSender sender = context.getSource().getSender();
 
+                Runnable r = () -> {
+                    for (Map.Entry<String, HeatmapLayer> layer : database.getHeatmapLayers().entrySet()) {
+                        String name = layer.getKey();
+                        HeatmapLayer heatmap = layer.getValue();
+
+                        // this is when the map is not supposed to update, these need date ranges to work, so we have to poll the database
+                        if (heatmap.getPollRangeSeconds() == HeatmapConfig.getNoUpdatePoolRangeSeconds()) {
+                            String dates = database.executeSql((connection) -> {
+                                try {
+                                    PreparedStatement stmt = connection.prepareStatement("SELECT `fromToDate` from " + HeatmapDatabase.getHeatmapLayerTableName() + " WHERE dyn_id = ? AND dyn_label = ?");
+                                    stmt.setString(1, name);
+                                    stmt.setString(2, name);
+                                    ResultSet result = stmt.executeQuery();
+                                    if (result.next()) {
+                                        return result.getString("fromToDate");
+                                    }
+                                } catch (Exception e) {
+                                    sender.sendRichMessage("<red>Failed Getting Heatmap Date Range: " + e.getMessage());
+                                }
+                                return "";
+                            });
+                            String[] split = dates.split(",");
+                            if (split.length < 2) {
+                                sender.sendRichMessage("<red>Cannot Parse \""+ name + "\" Heatmap's Date Range; Skipping.");
+                                continue;
+                            }
+
+                            String startDate = split[0];
+                            String endDate = split[1];
+                            pollHeatmapCommandFunction(sender, name, startDate, endDate);
+                        }
+                        // otherwise, these are based on relative time periods, it's saved in the struct, so we can just re-poll these normally
+                        else {
+                            pollHeatmapCommandFunction(sender, name, null, null);
+                        }
+                    }
+                };
+
+                new Thread(r).start();
+
+                PlayerActivityPoller.resumePolling();
+                return Command.SINGLE_SUCCESS;
+            });
 
 
         // Append subtrees
@@ -798,6 +860,7 @@ public class HeatmapCommand {
         commandRoot.then(resyncCommand);
         commandRoot.then(modifyCommand);
 
+        commandRoot.then(reloadConfig);
 
         commandRoot.then(infoCommand);
 
@@ -832,14 +895,14 @@ public class HeatmapCommand {
     static private int divideWorldCommandFunction(String heatmapName, CommandSender sender, Vector2d xy1, Vector2d xy2, int divisionCount, int pollRangeSeconds, String world, String fromDate, String toDate) {
 
         if (world.isEmpty())
-            world =  config.getString("defaults.world_name");
+            world = HeatmapConfig.getDefaultWorldName();
 
         long startTime = System.nanoTime();
 
         try {
             try {
 
-                int divisionCountDensityWarning = config.getInt("defaults.divisionDensityWarningCount");
+                int divisionCountDensityWarning = HeatmapConfig.getDivisionDensityWarningCount();
                 if (divisionCount > divisionCountDensityWarning) {
                     sender.sendRichMessage("<yellow>Warning, Division Count Above " + divisionCountDensityWarning + " The Dynmap May Have Severe Performance Issues; Especially Larger Surface Areas");
                 }
@@ -869,11 +932,10 @@ public class HeatmapCommand {
         sender.sendRichMessage("Created Heatmap <blue><b>" + heatmapName + "<reset>(<color:#30f000>" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime) + "ms<reset>)");
 
         // check to see if the map will update, if so display that time, else display a different message
-        if (pollRangeSeconds == config.getInt("defaults.noUpdatePollRangeSeconds")) {
+        if (pollRangeSeconds == HeatmapConfig.getNoUpdatePoolRangeSeconds()) {
             sender.sendRichMessage("Heatmap <blue><b>" + heatmapName + "<reset> Is Set To Not Update, To Change This See: <b>/mmheatmap modify...");
         } else {
-
-            sender.sendRichMessage("Heatmap <blue><b>" + heatmapName + "<reset> Will Update Every " + config.get("defaults.pollFrequencySeconds") + " Seconds Containing The Past " + pollRangeSeconds + " Seconds Of Activity Data, To Change This See: <b>/mmheatmap modify...");
+            sender.sendRichMessage("Heatmap <blue><b>" + heatmapName + "<reset> Will Update Every " + HeatmapConfig.getPollFrequencySeconds() + " Seconds Containing The Past " + pollRangeSeconds + " Seconds Of Activity Data, To Change This See: <b>/mmheatmap modify...");
         }
 
         return Command.SINGLE_SUCCESS;
@@ -943,7 +1005,7 @@ public class HeatmapCommand {
 
         long dynTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-dynStartTime);
 
-        if (config.getBoolean("defaults.logPollTime"))
+        if (HeatmapConfig.getLogPollTime())
             sender.sendRichMessage("<green>"+layerName+" Polling Completed! (Ttl: " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-startTime) + "ms, <blue>Db: "+queryTime+"ms, <red>Dyn: "+dynTime+"ms<green>)");
 
 
@@ -961,7 +1023,7 @@ public class HeatmapCommand {
      * @see HeatmapCommand#divideWorldCommandFunction(String, CommandSender, Vector2d, Vector2d, int, int, String, String, String)
      */
     static private int divideWorldCommandFunction(String heatmapName, CommandSender sender, Vector2d xy1, Vector2d xy2, int divisionCount, boolean doUpdate, String world, String fromDate, String toDate) {
-        int pollRangeSeconds = config.getInt((doUpdate) ? "defaults.pollRangeSeconds" : "defaults.noUpdatePollRangeSeconds");
+        int pollRangeSeconds = (doUpdate) ? HeatmapConfig.getPollRangeSeconds() : HeatmapConfig.getNoUpdatePoolRangeSeconds();
         return divideWorldCommandFunction(heatmapName, sender, xy1, xy2, divisionCount, pollRangeSeconds, world, fromDate, toDate);
     }
 
@@ -1013,7 +1075,7 @@ public class HeatmapCommand {
 
         long dynTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-dynStartTime);
 
-        if (config.getBoolean("defaults.logPollTime"))
+        if (HeatmapConfig.getLogPollTime())
             sender.sendRichMessage("<green>"+layerName+" Polling Completed! (Ttl: " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-startTime) + "ms, <blue>Db: "+queryTime+"ms, <red>Dyn: "+dynTime+"ms<green>)");
 
 
@@ -1152,7 +1214,7 @@ public class HeatmapCommand {
 
 
             // a special case must be used to get non-updating heatmap's from and to dates
-            if (layer.pollRangeSeconds == config.getInt("defaults.noUpdatePollRangeSeconds")) {
+            if (layer.pollRangeSeconds == HeatmapConfig.getNoUpdatePoolRangeSeconds()) {
                 String dateString = database.executeSql((connection) -> {
                     try {
                         PreparedStatement stmt = connection.prepareStatement("SELECT `fromToDate` FROM `"+HeatmapDatabase.getHeatmapLayerTableName()+"` WHERE `dyn_id` = ? AND `dyn_label` = ?");

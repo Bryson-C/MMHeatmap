@@ -1,5 +1,6 @@
 package org.bc.MMheatmap.poller;
 
+import org.bc.MMheatmap.HeatmapConfig;
 import org.bukkit.configuration.file.FileConfiguration;
 
 /**
@@ -10,12 +11,8 @@ import org.bukkit.configuration.file.FileConfiguration;
  */
 public class PlayerChunkInteractions {
     double activity;
-    static FileConfiguration config;
 
-
-    PlayerChunkInteractions(FileConfiguration config) {
-        PlayerChunkInteractions.config = config;
-    }
+    PlayerChunkInteractions() {}
 
     /**
      * @see String#toString()
@@ -54,6 +51,7 @@ public class PlayerChunkInteractions {
      * @return returns an activity score if above a threshold (determined by codebase user), otherwise 0
      */
     public int calculateActivityLevel() {
-        return (activity >= config.getInt("activityWeights.minimumActivityForRecording")) ? (int)Math.floor(activity) : 0;
+        double clamped = Math.clamp(activity, 0.0, HeatmapConfig.getMaxActivityPerPoll());
+        return (clamped >= HeatmapConfig.getMinimumActivityForRecording()) ? (int)Math.floor(clamped) : 0;
     }
 }
